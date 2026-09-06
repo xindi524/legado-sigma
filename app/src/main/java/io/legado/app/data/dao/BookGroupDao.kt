@@ -17,6 +17,10 @@ interface BookGroupDao {
     @Query("select * from book_groups where groupId = :id")
     fun getByID(id: Long): BookGroup?
 
+    // F1 嵌套分组：查询某分组的直接子分组
+    @Query("SELECT * FROM book_groups WHERE parentId = :parentId ORDER BY `order`")
+    fun getByParent(parentId: Long): List<BookGroup>
+
     @Query("select * from book_groups where groupName = :groupName")
     fun getByName(groupName: String): BookGroup?
 

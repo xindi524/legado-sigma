@@ -75,6 +75,10 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE (`group` & :group) > 0")
     fun flowByUserGroup(group: Long): Flow<List<Book>>
 
+    // F1 嵌套分组：按位掩码查询书籍（掩码 = 当前组及其所有子孙组的groupId按位或）
+    @Query("SELECT * FROM books WHERE (`group` & :mask) > 0")
+    fun flowByGroupMask(mask: Long): Flow<List<Book>>
+
     @Query("SELECT * FROM books WHERE name like '%'||:key||'%' or author like '%'||:key||'%'")
     fun flowSearch(key: String): Flow<List<Book>>
 
