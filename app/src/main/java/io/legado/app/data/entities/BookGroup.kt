@@ -26,7 +26,10 @@ data class BookGroup(
     var bookSort: Int = -1,
     // 只更新已读
     @ColumnInfo(defaultValue = "0")
-    var onlyUpdateRead: Boolean = false
+    var onlyUpdateRead: Boolean = false,
+    // 上级分组ID，0表示顶层分组（开源阅读D F1：嵌套分组）
+    @ColumnInfo(defaultValue = "0")
+    var parentId: Long = 0L
 ) : Parcelable {
 
     companion object {
