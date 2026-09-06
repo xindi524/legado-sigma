@@ -79,9 +79,36 @@ class GroupManageDialog : BaseDialogFragment(R.layout.dialog_recycler_view),
             appDb.bookGroupDao.flowAll().catch {
                 AppLog.put("书籍分组管理界面获取分组数据失败\n${it.localizedMessage}", it)
             }.flowOn(IO).conflate().collect {
-                adapter.setItems(it)
+                // F1 嵌套分组：按树形先序排列，子分组缩进显示
+                val (sorted, depths) = sortTree(it)
+                adapter.depthMap = depths
+                adapter.setItems(sorted)
             }
         }
+    }
+
+    // F1 嵌套分组：树形先序排序，返回(排序后列表, 分组ID->层级)
+    private fun sortTree(groups: List<BookGroup>): Pair<List<BookGroup>, Map<Long, Int>> {
+        val byParent = groups.groupBy { it.parentId }
+        val sorted = mutableListOf<BookGroup>()
+        val depths = mutableMapOf<Long, Int>()
+        fun walk(parentId: Long, depth: Int) {
+            byParent[parentId]?.forEach { g ->
+                if (depths.containsKey(g.groupId)) return@forEach
+                depths[g.groupId] = depth
+                sorted.add(g)
+                walk(g.groupId, depth + 1)
+            }
+        }
+        walk(0L, 0)
+        // 兜底：因环等原因未被遍历到的分组追加到末尾
+        groups.forEach { g ->
+            if (!depths.containsKey(g.groupId)) {
+                depths[g.groupId] = 0
+                sorted.add(g)
+            }
+        }
+        return sorted to depths
     }
 
     private fun initMenu() {
@@ -109,6 +136,9 @@ class GroupManageDialog : BaseDialogFragment(R.layout.dialog_recycler_view),
 
         private var isMoved = false
 
+        // F1 嵌套分组：分组层级，用于缩进显示
+        var depthMap: Map<Long, Int> = emptyMap()
+
         override fun getViewBinding(parent: ViewGroup): ItemBookGroupManageBinding {
             return ItemBookGroupManageBinding.inflate(inflater, parent, false)
         }
@@ -121,7 +151,7 @@ class GroupManageDialog : BaseDialogFragment(R.layout.dialog_recycler_view),
         ) {
             binding.run {
                 root.setBackgroundColor(context.backgroundColor)
-                tvGroup.text = item.getManageName(context)
+                tvGroup.text = "　".repeat(depthMap[item.groupId] ?: 0) + item.getManageName(context)
                 swShow.isChecked = item.show
             }
         }
