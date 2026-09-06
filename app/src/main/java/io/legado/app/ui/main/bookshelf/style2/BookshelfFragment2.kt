@@ -42,6 +42,7 @@ import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.max
 
 /**
@@ -67,6 +68,8 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         }
     }
     private var bookGroups: List<BookGroup> = emptyList()
+    // F1 嵌套分组：导航栈，保存从根部进入当前分组的层级链
+    private val groupStack = ArrayDeque<Long>()
     private var booksFlowJob: Job? = null
     override var groupId = BookGroup.IdRoot
     override var books: List<Book> = emptyList()
@@ -161,11 +164,7 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
     private fun initBooksData() {
         if (groupId == BookGroup.IdRoot) {
             if (isAdded) {
-                binding.titleBar.title = getString(R.string.bookshelf)
-                binding.refreshLayout.isEnabled = true
-                enableRefresh = true
-            }
-        } else {
+                binding.titleBar.title = getString(R.s} else {
             bookGroups.firstOrNull {
                 groupId == it.groupId
             }?.let {
@@ -177,7 +176,9 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         }
         booksFlowJob?.cancel()
         booksFlowJob = viewLifecycleOwner.lifecycleScope.launch {
-            appDb.bookDao.flowByGroup(groupId).map { list ->
+            // F1 嵌套分组：用"当前组+所有子孙组"的位掩码查询，子孙组的书也在父组视图显示
+            val mask = computeGroupMask(groupId)
+            appDb.bookDao.flowByGroupMask(mask).map { list ->
                 //排序
                 when (AppConfig.getBookSortByGroupId(groupId)) {
                     1 -> list.sortedByDescending {
@@ -222,12 +223,36 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
     }
 
     fun back(): Boolean {
+        if (groupStack.isNotEmpty()) {
+            groupId = groupStack.removeLast()
+            initBooksData()
+            return true
+        }
         if (groupId != BookGroup.IdRoot) {
             groupId = BookGroup.IdRoot
             initBooksData()
             return true
         }
         return false
+    }
+
+    // F1 嵌套分组：计算分组及其所有子孙分组的位掩码
+    private suspend fun computeGroupMask(gid: Long): Long = withContext(Dispatchers.IO) {
+        if (gid < 0) return@withContext gid
+        val all = appDb.bookGroupDao.all
+        val ids = mutableSetOf(gid)
+        var changed = true
+        while (changed) {
+            changed = false
+            for (g in all) {
+                if (g.parentId in ids && ids.add(g.groupId)) {
+                    changed = true
+                }
+            }
+        }
+        var mask = 0L
+        ids.forEach { mask = mask or it }
+        mask
     }
 
     override fun onQueryTextSubmit(query: String?): Boolean {
@@ -252,6 +277,12 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
             is Book -> startActivityForBook(item)
 
             is BookGroup -> {
+                // F1 嵌套分组：记录层级链，返回键逐级回退
+                if (groupId != BookGroup.IdRoot) {
+                    groupStack.addLast(groupId)
+                } else {
+                    groupStack.clear()
+                }
                 groupId = item.groupId
                 initBooksData()
             }
@@ -273,19 +304,21 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         return activityViewModel.isUpdate(bookUrl)
     }
 
-    fun getItemCount(): Int {
-        return if (groupId == BookGroup.IdRoot) {
-            bookGroups.size + books.size
-        } else {
-            books.size
+    // F1 嵌套分组：当前视图应显示的分组块
+    // 根部只显示顶层分组（parentId=0），组内显示其子分组块
+    private fun getCurrentGroups(): List<BookGroup> {
+        return when (groupId) {
+            BookGroup.IdRoot -> bookGroups.filter { it.parentId == 0L }
+            else -> bookGroups.filter { it.parentId == groupId }
         }
     }
 
+    fun getItemCount(): Int {
+        return getCurrentGroups().size + books.size
+    }
+
     override fun getItems(): List<Any> {
-        if (groupId != BookGroup.IdRoot) {
-            return books
-        }
-        return bookGroups + books
+        return getCurrentGroups() + books
     }
 
     @SuppressLint("NotifyDataSetChanged")
