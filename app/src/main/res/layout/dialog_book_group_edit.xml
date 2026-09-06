@@ -95,7 +95,32 @@
             android:text="@string/only_update_read"
             android:checked="false"
             app:layout_constraintTop_toBottomOf="@+id/cb_enable_refresh"
-            app:layout_constraintLeft_toLeftOf="@id/tv_sort" />
+            app:layout_constraintLeft_toLeftOf="@+id/tv_sort" />
+
+        <io.legado.app.ui.widget.text.AccentTextView
+            android:id="@+id/tv_parent_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="3dp"
+            android:text="上级分组"
+            android:textColor="@color/primaryText"
+            app:layout_constraintLeft_toLeftOf="@id/tv_sort"
+            app:layout_constraintTop_toBottomOf="@+id/cb_enable_only_read" />
+
+        <TextView
+            android:id="@+id/tv_parent_value"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="6dp"
+            android:padding="3dp"
+            android:text="无（顶层分组）"
+            android:ellipsize="end"
+            android:maxLines="1"
+            app:layout_constraintBottom_toBottomOf="@+id/tv_parent_label"
+            app:layout_constraintLeft_toRightOf="@+id/tv_parent_label"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintTop_toTopOf="@+id/tv_parent_label"
+            tools:ignore="RtlHardcoded" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
