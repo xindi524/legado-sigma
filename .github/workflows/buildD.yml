@@ -1,0 +1,40 @@
+name: Build D (debug apk)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: 17
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Fix debug keystore (keep same signature across builds)
+        run: |
+          mkdir -p ~/.android
+          cp $GITHUB_WORKSPACE/.github/debugD.keystore ~/.android/debug.keystore
+
+      - name: Build With Gradle
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleAppDebug --build-cache --parallel --warning-mode all
+
+      - name: Organize the Files
+        run: |
+          mkdir -p ${{ github.workspace }}/apk/
+          cp -rf ${{ github.workspace }}/app/build/outputs/apk/app/debug/*.apk ${{ github.workspace }}/apk/
+
+      - name: Upload App To Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: legado_D_debug_apk
+          path: ${{ github.workspace }}/apk/*.apk
