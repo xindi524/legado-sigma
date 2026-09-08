@@ -11,7 +11,8 @@ plugins {
     alias libs.plugins.kotlin.parcelize
     alias libs.plugins.room
     alias libs.plugins.ksp
-    alias libs.plugins.google.services
+    // 开源阅读D：移除 google-services 插件（其要求包名与google-services.json一致，改包名后会编译失败，且本应用不需要Firebase）
+    //alias libs.plugins.google.services
 }
 apply from: 'download.gradle'
 
@@ -291,10 +292,10 @@ dependencies {
     //noinspection GradleDependency,GradlePackageUpdate
     implementation(libs.hutool.crypto)
 
-    //firebase, 崩溃统计和性能统计
-    implementation platform(libs.firebase.bom)
-    implementation libs.firebase.analytics
-    implementation libs.firebase.perf
+    //firebase, 崩溃统计和性能统计（开源阅读D：未使用，移除以减小体积）
+    //implementation platform(libs.firebase.bom)
+    //implementation libs.firebase.analytics
+    //implementation libs.firebase.perf
 
     implementation libs.glide.recyclerview
 
