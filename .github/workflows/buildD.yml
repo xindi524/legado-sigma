@@ -31,10 +31,10 @@ jobs:
       - name: Organize the Files
         run: |
           mkdir -p ${{ github.workspace }}/apk/
-          cp -rf ${{ github.workspace }}/app/build/outputs/apk/app/debug/*.apk ${{ github.workspace }}/apk/
+          cp -rf ${{ github.workspace }}/app/build/outputs/apk/*/*/*.apk ${{ github.workspace }}/apk/
 
       - name: Upload App To Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: legado_D_debug_apk
           path: ${{ github.workspace }}/apk/*.apk
