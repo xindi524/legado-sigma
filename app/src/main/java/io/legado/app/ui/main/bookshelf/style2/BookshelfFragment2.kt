@@ -180,9 +180,14 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         }
         booksFlowJob?.cancel()
         booksFlowJob = viewLifecycleOwner.lifecycleScope.launch {
-            // F1 嵌套分组：用"当前组+所有子孙组"的位掩码查询，子孙组的书也在父组视图显示
-            val mask = computeGroupMask(groupId)
-            appDb.bookDao.flowByGroupMask(mask).map { list ->
+            // F1 嵌套分组：普通分组用"当前组+所有子孙组"的位掩码查询（子孙组的书也在父组视图显示）；
+            // 书架根部与特殊分组（全部/本地等负数ID）沿用原版查询逻辑，否则未分组书(group=0)会被位运算过滤掉
+            val bookFlow = if (groupId > 0) {
+                appDb.bookDao.flowByGroupMask(computeGroupMask(groupId))
+            } else {
+                appDb.bookDao.flowByGroup(groupId)
+            }
+            bookFlow.map { list ->
                 //排序
                 when (AppConfig.getBookSortByGroupId(groupId)) {
                     1 -> list.sortedByDescending {
