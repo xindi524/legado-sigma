@@ -26,7 +26,21 @@ jobs:
       - name: Build With Gradle
         run: |
           chmod +x gradlew
-          ./gradlew assembleAppDebug --build-cache --parallel --warning-mode all
+          set +e
+          ./gradlew assembleAppDebug --build-cache --parallel --warning-mode all 2>&1 | tee build.log
+          ec=${PIPESTATUS[0]}
+          if [ "$ec" -ne 0 ]; then
+            {
+              echo "## ❌ 编译错误汇总（给开发者的自动提取）"
+              echo '```'
+              grep -nE "^e: |error: |FAILURE: " build.log | head -60 || echo "未匹配到典型错误行，请下载完整日志"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          grep -E "^e: " build.log | head -30 | while IFS= read -r line; do
+            echo "::error::${line:0:500}"
+          done || true
+          exit $ec
 
       - name: Organize the Files
         run: |
