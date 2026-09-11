@@ -72,9 +72,7 @@ class GroupSelectDialog() : BaseDialogFragment(R.layout.dialog_book_group_picker
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.addItemDecoration(VerticalDivider(requireContext()))
         binding.recyclerView.adapter = adapter
-        val itemTouchCallback = ItemTouchCallback(adapter)
-        itemTouchCallback.isCanDrag = true
-        ItemTouchHelper(itemTouchCallback).attachToRecyclerView(binding.recyclerView)
+        // F1 嵌套分组：树形展示，禁用拖拽避免层级错乱
         binding.tvCancel.setOnClickListener {
             dismissAllowingStateLoss()
         }
@@ -88,9 +86,36 @@ class GroupSelectDialog() : BaseDialogFragment(R.layout.dialog_book_group_picker
     private fun initData() {
         lifecycleScope.launch {
             appDb.bookGroupDao.flowSelect().conflate().collect {
-                adapter.setItems(it)
+                // F1 嵌套分组：按树形先序排列，子分组缩进显示
+                val (sorted, depths) = sortTree(it)
+                adapter.depthMap = depths
+                adapter.setItems(sorted)
             }
         }
+    }
+
+    // F1 嵌套分组：树形先序排序，返回(排序后列表, 分组ID->层级)
+    private fun sortTree(groups: List<BookGroup>): Pair<List<BookGroup>, Map<Long, Int>> {
+        val byParent = groups.groupBy { it.parentId }
+        val sorted = mutableListOf<BookGroup>()
+        val depths = mutableMapOf<Long, Int>()
+        fun walk(parentId: Long, depth: Int) {
+            byParent[parentId]?.forEach { g ->
+                if (depths.containsKey(g.groupId)) return@forEach
+                depths[g.groupId] = depth
+                sorted.add(g)
+                walk(g.groupId, depth + 1)
+            }
+        }
+        walk(0L, 0)
+        // 兜底：因环等原因未被遍历到的分组追加到末尾
+        groups.forEach { g ->
+            if (!depths.containsKey(g.groupId)) {
+                depths[g.groupId] = 0
+                sorted.add(g)
+            }
+        }
+        return sorted to depths
     }
 
     override fun onMenuItemClick(item: MenuItem?): Boolean {
@@ -108,6 +133,9 @@ class GroupSelectDialog() : BaseDialogFragment(R.layout.dialog_book_group_picker
 
         private var isMoved: Boolean = false
 
+        // F1 嵌套分组：分组层级，用于缩进显示
+        var depthMap: Map<Long, Int> = emptyMap()
+
         override fun getViewBinding(parent: ViewGroup): ItemGroupSelectBinding {
             return ItemGroupSelectBinding.inflate(inflater, parent, false)
         }
@@ -120,7 +148,7 @@ class GroupSelectDialog() : BaseDialogFragment(R.layout.dialog_book_group_picker
         ) {
             binding.run {
                 root.setBackgroundColor(context.backgroundColor)
-                cbGroup.text = item.groupName
+                cbGroup.text = "　".repeat(depthMap[item.groupId] ?: 0) + item.groupName
                 cbGroup.isChecked = (groupId and item.groupId) > 0
             }
         }

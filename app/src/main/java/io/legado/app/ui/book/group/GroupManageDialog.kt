@@ -65,7 +65,8 @@ class GroupManageDialog : BaseDialogFragment(R.layout.dialog_recycler_view),
         binding.recyclerView.addItemDecoration(VerticalDivider(requireContext()))
         binding.recyclerView.adapter = adapter
         val itemTouchCallback = ItemTouchCallback(adapter)
-        itemTouchCallback.isCanDrag = true
+        // F1 嵌套分组：树形展示下禁用拖拽，避免层级错乱
+        itemTouchCallback.isCanDrag = false
         ItemTouchHelper(itemTouchCallback).attachToRecyclerView(binding.recyclerView)
         binding.tvOk.setTextColor(requireContext().accentColor)
         binding.tvOk.visible()
