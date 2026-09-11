@@ -18,8 +18,14 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
 
-      - name: Fix debug keystore (keep same signature across builds)
+      - name: Setup signing (stable signature across builds)
         run: |
+          echo "" >> gradle.properties
+          echo RELEASE_KEY_ALIAS='androiddebugkey' >> gradle.properties
+          echo RELEASE_KEY_PASSWORD='android' >> gradle.properties
+          echo RELEASE_STORE_PASSWORD='android' >> gradle.properties
+          echo RELEASE_STORE_FILE='./key.jks' >> gradle.properties
+          cp $GITHUB_WORKSPACE/.github/debugD.keystore $GITHUB_WORKSPACE/app/key.jks
           mkdir -p ~/.android
           cp $GITHUB_WORKSPACE/.github/debugD.keystore ~/.android/debug.keystore
 
