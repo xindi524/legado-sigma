@@ -75,6 +75,19 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE (`group` & :group) > 0")
     fun flowByUserGroup(group: Long): Flow<List<Book>>
 
+    // F1 嵌套分组：书架主页专用——显示所有未分组书（网络+本地合并），排除音频/视频/未入书架的书
+    @Query(
+        """
+        select * from books
+        where type & ${BookType.audio} = 0
+        and type & ${BookType.video} = 0
+        and type & ${BookType.notShelf} = 0
+        and (type & ${BookType.local} > 0 or type & ${BookType.text} > 0)
+        and ((SELECT sum(groupId) FROM book_groups where groupId > 0) & `group`) = 0
+        """
+    )
+    fun flowRootAll(): Flow<List<Book>>
+
     // F1 嵌套分组：按位掩码查询书籍（掩码 = 当前组及其所有子孙组的groupId按位或）
     @Query("SELECT * FROM books WHERE (`group` & :mask) > 0")
     fun flowByGroupMask(mask: Long): Flow<List<Book>>
