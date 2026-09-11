@@ -42,7 +42,6 @@ import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlin.math.max
 
 /**
@@ -180,10 +179,10 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         }
         booksFlowJob?.cancel()
         booksFlowJob = viewLifecycleOwner.lifecycleScope.launch {
-            // F1 嵌套分组：普通分组用"当前组+所有子孙组"的位掩码查询（子孙组的书也在父组视图显示）；
-            // 书架根部与特殊分组（全部/本地等负数ID）沿用原版查询逻辑，否则未分组书(group=0)会被位运算过滤掉
-            val bookFlow = if (groupId > 0) {
-                appDb.bookDao.flowByGroupMask(computeGroupMask(groupId))
+            // F1 嵌套分组：主页(根部)即"全部"，显示所有书；普通分组只显示直属的书（只标了子组的书不在父组显示）；
+            // 全部/本地等特殊分组沿用原版查询逻辑
+            val bookFlow = if (groupId == BookGroup.IdRoot) {
+                appDb.bookDao.flowAll()
             } else {
                 appDb.bookDao.flowByGroup(groupId)
             }
@@ -245,25 +244,6 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         return false
     }
 
-    // F1 嵌套分组：计算分组及其所有子孙分组的位掩码
-    private suspend fun computeGroupMask(gid: Long): Long = withContext(Dispatchers.IO) {
-        if (gid < 0) return@withContext gid
-        val all = appDb.bookGroupDao.all
-        val ids = mutableSetOf(gid)
-        var changed = true
-        while (changed) {
-            changed = false
-            for (g in all) {
-                if (g.parentId in ids && ids.add(g.groupId)) {
-                    changed = true
-                }
-            }
-        }
-        var mask = 0L
-        ids.forEach { mask = mask or it }
-        mask
-    }
-
     override fun onQueryTextSubmit(query: String?): Boolean {
         SearchActivity.start(requireContext(), query)
         return false
@@ -315,9 +295,11 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
 
     // F1 嵌套分组：当前视图应显示的分组块
     // 根部只显示顶层分组（parentId=0），组内显示其子分组块
+    // 主页即"全部"：去掉"全部/网络未分组/本地未分组"三个冗余块，未分组书直接散在主页
     private fun getCurrentGroups(): List<BookGroup> {
+        val hideIds = listOf(BookGroup.IdAll, BookGroup.IdNetNone, BookGroup.IdLocalNone)
         return when (groupId) {
-            BookGroup.IdRoot -> bookGroups.filter { it.parentId == 0L }
+            BookGroup.IdRoot -> bookGroups.filter { it.parentId == 0L && it.groupId !in hideIds }
             else -> bookGroups.filter { it.parentId == groupId }
         }
     }
