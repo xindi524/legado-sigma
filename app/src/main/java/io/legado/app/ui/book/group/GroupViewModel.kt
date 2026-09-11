@@ -2,14 +2,18 @@ package io.legado.app.ui.book.group
 
 import android.app.Application
 import io.legado.app.base.BaseViewModel
+import io.legado.app.constant.EventBus
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookGroup
+import io.legado.app.utils.postEvent
 
 class GroupViewModel(application: Application) : BaseViewModel(application) {
 
     fun upGroup(vararg bookGroup: BookGroup, finally: (() -> Unit)? = null) {
         execute {
             appDb.bookGroupDao.update(*bookGroup)
+            // F1 嵌套分组：通知书架强制刷新分组列表
+            postEvent(EventBus.BOOK_GROUP_CHANGED, "")
         }.onFinally {
             finally?.invoke()
         }
@@ -38,6 +42,8 @@ class GroupViewModel(application: Application) : BaseViewModel(application) {
             )
             appDb.bookGroupDao.getByID(groupId) ?: appDb.bookDao.removeGroup(groupId)
             appDb.bookGroupDao.insert(bookGroup)
+            // F1 嵌套分组：通知书架强制刷新分组列表
+            postEvent(EventBus.BOOK_GROUP_CHANGED, "")
         }.onFinally {
             finally()
         }
@@ -53,6 +59,8 @@ class GroupViewModel(application: Application) : BaseViewModel(application) {
             }
             appDb.bookGroupDao.delete(bookGroup)
             appDb.bookDao.removeGroup(bookGroup.groupId)
+            // F1 嵌套分组：通知书架强制刷新分组列表
+            postEvent(EventBus.BOOK_GROUP_CHANGED, "")
         }.onFinally {
             finally()
         }
