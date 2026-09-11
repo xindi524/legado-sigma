@@ -179,10 +179,10 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         }
         booksFlowJob?.cancel()
         booksFlowJob = viewLifecycleOwner.lifecycleScope.launch {
-            // F1 嵌套分组：主页(根部)即"全部"，显示所有书；普通分组只显示直属的书（只标了子组的书不在父组显示）；
-            // 全部/本地等特殊分组沿用原版查询逻辑
+            // F1 嵌套分组：主页(根部)=顶层分组块+未分组的书（分组书只出现在所属分组，主页不重复显示）；
+            // 普通分组只显示直属的书；全部/本地等特殊分组沿用原版查询逻辑
             val bookFlow = if (groupId == BookGroup.IdRoot) {
-                appDb.bookDao.flowAll()
+                appDb.bookDao.flowRootAll()
             } else {
                 appDb.bookDao.flowByGroup(groupId)
             }
