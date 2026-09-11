@@ -33,6 +33,7 @@ import io.legado.app.ui.widget.dialog.WaitDialog
 import io.legado.app.utils.checkByIndex
 import io.legado.app.utils.getCheckedIndex
 import io.legado.app.utils.isAbsUrl
+import io.legado.app.utils.observeEvent
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.readText
 import io.legado.app.utils.sendToClip
@@ -143,6 +144,10 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
             } else {
                 waitDialog.setText("添加中... ($count)")
             }
+        }
+        // F1 嵌套分组：分组数据变更后强制重新拉取分组列表（修复LiveData未推送导致书架不刷新）
+        observeEvent<String>(EventBus.BOOK_GROUP_CHANGED) {
+            initBookGroupData()
         }
     }
 
