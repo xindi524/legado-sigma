@@ -216,16 +216,20 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
             ).catch {
                 AppLog.put("书架更新出错", it)
             }.conflate().flowOn(Dispatchers.Default).collect { list ->
-                books = list
-                booksAdapter.updateItems(groupId)
-                itemCount = getItemCount()
-                val spanCount = bookshelfLayout
-                if (spanCount >= 2) {
-                    totalRows = if (itemCount % spanCount == 0) itemCount / spanCount else itemCount / spanCount + 1
+                try {
+                    books = list
+                    booksAdapter.updateItems(groupId)
+                    itemCount = getItemCount()
+                    val spanCount = bookshelfLayout
+                    if (spanCount >= 2) {
+                        totalRows = if (itemCount % spanCount == 0) itemCount / spanCount else itemCount / spanCount + 1
+                    }
+                    binding.tvEmptyMsg.isGone = itemCount > 0
+                    binding.refreshLayout.isEnabled = enableRefresh && itemCount > 0
+                    delay(100)
+                } catch (e: Exception) {
+                    AppLog.put("书架书籍列表处理失败\n${e.localizedMessage}", e)
                 }
-                binding.tvEmptyMsg.isGone = itemCount > 0
-                binding.refreshLayout.isEnabled = enableRefresh && itemCount > 0
-                delay(100)
             }
         }
     }
@@ -294,11 +298,12 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
     }
 
     // F1 嵌套分组：当前视图应显示的分组块
-    // 主页=全部：首页只显示用户自建的顶层分组块（parentId=0），系统来源分组（全部/本地/网络未分组等负数ID）一律不上首页，
-    // 未分组的书（本地+网络）直接散落在首页；组内显示其子分组块
+    // 主页=全部：首页显示用户自建顶层分组块＋按开关启用的功能性分组块（本地/音频/视频/更新失败），
+    // "全部/网络未分组/本地未分组"三个冗余块不上首页；未分组的书（本地+网络）直接散落首页
     private fun getCurrentGroups(): List<BookGroup> {
+        val hideIds = listOf(BookGroup.IdAll, BookGroup.IdNetNone, BookGroup.IdLocalNone)
         return when (groupId) {
-            BookGroup.IdRoot -> bookGroups.filter { it.parentId == 0L && it.groupId > 0 }
+            BookGroup.IdRoot -> bookGroups.filter { it.parentId == 0L && it.groupId !in hideIds }
             else -> bookGroups.filter { it.parentId == groupId }
         }
     }
