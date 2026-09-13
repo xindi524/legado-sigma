@@ -29,7 +29,7 @@ interface BookGroupDao {
 
     @get:Query(
         """
-        with const as (SELECT sum(groupId) sumGroupId FROM book_groups where groupId > 0)
+        with const as (SELECT coalesce(sum(groupId), 0) sumGroupId FROM book_groups where groupId > 0)
         SELECT book_groups.* FROM book_groups join const
         where show > 0
         and (

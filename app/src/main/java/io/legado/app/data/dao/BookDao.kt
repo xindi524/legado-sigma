@@ -38,7 +38,7 @@ interface BookDao {
         """
         select * from books where type & ${BookType.text} > 0
         and type & ${BookType.local} = 0
-        and ((SELECT sum(groupId) FROM book_groups where groupId > 0) & `group`) = 0
+        and ((SELECT coalesce(sum(groupId), 0) FROM book_groups where groupId > 0) & `group`) = 0
         and (select show from book_groups where groupId = ${BookGroup.IdNetNone}) != 1
         """
     )
@@ -59,7 +59,7 @@ interface BookDao {
     @Query(
         """
         select * from books where type & ${BookType.audio} = 0 and type & ${BookType.local} = 0 and type & ${BookType.video} = 0
-        and ((SELECT sum(groupId) FROM book_groups where groupId > 0) & `group`) = 0
+        and ((SELECT coalesce(sum(groupId), 0) FROM book_groups where groupId > 0) & `group`) = 0
         """
     )
     fun flowNetNoGroup(): Flow<List<Book>>
@@ -67,7 +67,7 @@ interface BookDao {
     @Query(
         """
         select * from books where type & ${BookType.local} > 0
-        and ((SELECT sum(groupId) FROM book_groups where groupId > 0) & `group`) = 0
+        and ((SELECT coalesce(sum(groupId), 0) FROM book_groups where groupId > 0) & `group`) = 0
         """
     )
     fun flowLocalNoGroup(): Flow<List<Book>>
@@ -83,7 +83,7 @@ interface BookDao {
         and type & ${BookType.video} = 0
         and type & ${BookType.notShelf} = 0
         and (type & ${BookType.local} > 0 or type & ${BookType.text} > 0)
-        and ((SELECT sum(groupId) FROM book_groups where groupId > 0) & `group`) = 0
+        and ((SELECT coalesce(sum(groupId), 0) FROM book_groups where groupId > 0) & `group`) = 0
         """
     )
     fun flowRootAll(): Flow<List<Book>>
