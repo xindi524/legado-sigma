@@ -327,6 +327,14 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
                 groupStack.clear()
             }
             initBooksData()
+            // F1: 数据已确认新鲜送达但diff未应用变化，强制全量重绘兜底
+            try {
+                binding.rvBookshelf.post {
+                    booksAdapter.notifyDataSetChanged()
+                }
+            } catch (e: Exception) {
+                AppLog.put("F1诊断: notifyDataSetChanged失败\n${e.localizedMessage}", e)
+            }
         }
     }
 
