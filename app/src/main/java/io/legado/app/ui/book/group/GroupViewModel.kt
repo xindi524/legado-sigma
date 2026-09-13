@@ -5,15 +5,19 @@ import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.EventBus
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookGroup
+import io.legado.app.help.GroupChangeNotifier
 import io.legado.app.utils.postEvent
+import io.legado.app.utils.postEventDelay
 
 class GroupViewModel(application: Application) : BaseViewModel(application) {
 
     fun upGroup(vararg bookGroup: BookGroup, finally: (() -> Unit)? = null) {
         execute {
             appDb.bookGroupDao.update(*bookGroup)
-            // F1 嵌套分组：通知书架强制刷新分组列表
+            // F1 嵌套分组：通知书架刷新分组列表（直调主通道+事件双保险）
+            GroupChangeNotifier.notifyChanged()
             postEvent(EventBus.BOOK_GROUP_CHANGED, "")
+            postEventDelay(EventBus.BOOK_GROUP_CHANGED_DELAYED, "", 600)
         }.onFinally {
             finally?.invoke()
         }
@@ -42,8 +46,10 @@ class GroupViewModel(application: Application) : BaseViewModel(application) {
             )
             appDb.bookGroupDao.getByID(groupId) ?: appDb.bookDao.removeGroup(groupId)
             appDb.bookGroupDao.insert(bookGroup)
-            // F1 嵌套分组：通知书架强制刷新分组列表
+            // F1 嵌套分组：通知书架刷新分组列表（直调主通道+事件双保险）
+            GroupChangeNotifier.notifyChanged()
             postEvent(EventBus.BOOK_GROUP_CHANGED, "")
+            postEventDelay(EventBus.BOOK_GROUP_CHANGED_DELAYED, "", 600)
         }.onFinally {
             finally()
         }
@@ -59,8 +65,10 @@ class GroupViewModel(application: Application) : BaseViewModel(application) {
             }
             appDb.bookGroupDao.delete(bookGroup)
             appDb.bookDao.removeGroup(bookGroup.groupId)
-            // F1 嵌套分组：通知书架强制刷新分组列表
+            // F1 嵌套分组：通知书架刷新分组列表（直调主通道+事件双保险）
+            GroupChangeNotifier.notifyChanged()
             postEvent(EventBus.BOOK_GROUP_CHANGED, "")
+            postEventDelay(EventBus.BOOK_GROUP_CHANGED_DELAYED, "", 600)
         }.onFinally {
             finally()
         }
