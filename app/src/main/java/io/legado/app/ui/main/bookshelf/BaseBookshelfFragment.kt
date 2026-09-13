@@ -146,7 +146,11 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
                 .conflate()
                 .collect { all ->
                     // 维持原 show 语义：仅显示已启用的分组
-                    upGroup(all.filter { it.show })
+                    try {
+                        upGroup(all.filter { it.show })
+                    } catch (e: Exception) {
+                        AppLog.put("分组列表处理失败\n${e.localizedMessage}", e)
+                    }
                 }
         }
     }
