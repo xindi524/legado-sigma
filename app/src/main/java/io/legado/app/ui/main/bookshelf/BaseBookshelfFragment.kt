@@ -146,6 +146,7 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
                 .flowOn(Dispatchers.IO)
                 .conflate()
                 .collect { all ->
+                    AppLog.put("F1诊断: initBookGroupData 收到 ${all.size} 个分组")
                     // 维持原 show 语义：仅显示已启用的分组
                     try {
                         upGroup(all.filter { it.show })
@@ -185,6 +186,7 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
      * F1 嵌套分组：分组数据变更后的刷新入口，子类可扩展
      */
     open fun refreshGroupData() {
+        AppLog.put("F1诊断: Base.refreshGroupData 被调用")
         if (viewLifecycleOwnerLiveData.value != null) {
             initBookGroupData()
         }
