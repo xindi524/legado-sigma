@@ -8,6 +8,7 @@ import androidx.core.view.indices
 import androidx.fragment.app.activityViewModels
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.LiveData
+import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.base.VMBaseFragment
 import io.legado.app.constant.AppLog
@@ -86,6 +87,7 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
     abstract val books: List<Book>
     abstract var onlyUpdateRead: Boolean
     private var groupsLiveData: LiveData<List<BookGroup>>? = null
+    private var groupsFlowJob: Job? = null
     private val waitDialog by lazy {
         WaitDialog(requireContext()).apply {
             setOnCancelListener {
