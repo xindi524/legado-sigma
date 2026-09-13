@@ -298,10 +298,10 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
     }
 
     // F1 嵌套分组：当前视图应显示的分组块
-    // 主页=全部：首页显示用户自建顶层分组块＋按开关启用的功能性分组块（本地/音频/视频/更新失败），
-    // "全部/网络未分组/本地未分组"三个冗余块不上首页；未分组的书（本地+网络）直接散落首页
+    // 主页=全部：首页显示用户自建顶层分组块＋"全部/本地/音频"等受开关控制的功能块（show 开关），
+    // "网络未分组/本地未分组"两个拆分视图不上首页；未分组的书（本地+网络）直接散落首页
     private fun getCurrentGroups(): List<BookGroup> {
-        val hideIds = listOf(BookGroup.IdAll, BookGroup.IdNetNone, BookGroup.IdLocalNone)
+        val hideIds = listOf(BookGroup.IdNetNone, BookGroup.IdLocalNone)
         return when (groupId) {
             BookGroup.IdRoot -> bookGroups.filter { it.parentId == 0L && it.groupId !in hideIds }
             else -> bookGroups.filter { it.parentId == groupId }
@@ -316,6 +316,18 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         return getCurrentGroups() + books
     }
 
+    // F1 嵌套分组：分组变更直调刷新入口（含当前视图组被删时的回根部保护）
+    override fun refreshGroupData() {
+        super.refreshGroupData()
+        if (viewLifecycleOwnerLiveData.value != null) {
+            if (groupId > 0 && appDb.bookGroupDao.getByID(groupId) == null) {
+                groupId = BookGroup.IdRoot
+                groupStack.clear()
+            }
+            initBooksData()
+        }
+    }
+
     @SuppressLint("NotifyDataSetChanged")
     override fun observeLiveBus() {
         super.observeLiveBus()
@@ -325,13 +337,9 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         observeEvent<String>(EventBus.BOOKSHELF_REFRESH) {
             booksAdapter.notifyDataSetChanged()
         }
-        // F1 嵌套分组：分组变更后，当前视图的组被删则回根部，并重启书籍查询
-        observeEvent<String>(EventBus.BOOK_GROUP_CHANGED) {
-            if (groupId > 0 && appDb.bookGroupDao.getByID(groupId) == null) {
-                groupId = BookGroup.IdRoot
-                groupStack.clear()
-            }
-            initBooksData()
+        // F1 嵌套分组：分组变更延迟补发（防时序竞态的兜底，主通道为 GroupChangeNotifier 直调）
+        observeEvent<String>(EventBus.BOOK_GROUP_CHANGED_DELAYED) {
+            refreshGroupData()
         }
     }
 }
