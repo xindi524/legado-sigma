@@ -10,8 +10,15 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.LiveData
 import io.legado.app.R
 import io.legado.app.base.VMBaseFragment
+import io.legado.app.constant.AppLog
 import io.legado.app.constant.EventBus
 import io.legado.app.data.appDb
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.launch
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.databinding.DialogBookshelfConfigBinding
@@ -125,11 +132,20 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
     }
 
     protected fun initBookGroupData() {
+        // F1 嵌套分组：改用 Flow 直连（与分组管理页同机制），修复弹窗场景下 LiveData 不推送导致书架不刷新
         groupsLiveData?.removeObservers(viewLifecycleOwner)
-        groupsLiveData = appDb.bookGroupDao.show.apply {
-            observe(viewLifecycleOwner) {
-                upGroup(it)
-            }
+        groupsFlowJob?.cancel()
+        groupsFlowJob = viewLifecycleOwner.lifecycleScope.launch {
+            appDb.bookGroupDao.flowAll()
+                .catch {
+                    AppLog.put("获取分组列表失败\n${it.localizedMessage}", it)
+                }
+                .flowOn(Dispatchers.IO)
+                .conflate()
+                .collect { all ->
+                    // 维持原 show 语义：仅显示已启用的分组
+                    upGroup(all.filter { it.show })
+                }
         }
     }
 
