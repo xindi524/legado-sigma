@@ -41,4 +41,5 @@ object EventBus {
     const val UP_VIDEO_INFO = "upVideoInfo"
     // F1 嵌套分组：分组数据（增删改/层级变化）变更后广播，书架强制重拉分组列表
     const val BOOK_GROUP_CHANGED = "bookGroupChanged"
+    const val BOOK_GROUP_CHANGED_DELAYED = "bookGroupChangedDelayed"
 }
