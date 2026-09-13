@@ -294,12 +294,11 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
     }
 
     // F1 嵌套分组：当前视图应显示的分组块
-    // 根部只显示顶层分组（parentId=0），组内显示其子分组块
-    // 主页即"全部"：去掉"全部/网络未分组/本地未分组"三个冗余块，未分组书直接散在主页
+    // 主页=全部：首页只显示用户自建的顶层分组块（parentId=0），系统来源分组（全部/本地/网络未分组等负数ID）一律不上首页，
+    // 未分组的书（本地+网络）直接散落在首页；组内显示其子分组块
     private fun getCurrentGroups(): List<BookGroup> {
-        val hideIds = listOf(BookGroup.IdAll, BookGroup.IdNetNone, BookGroup.IdLocalNone)
         return when (groupId) {
-            BookGroup.IdRoot -> bookGroups.filter { it.parentId == 0L && it.groupId !in hideIds }
+            BookGroup.IdRoot -> bookGroups.filter { it.parentId == 0L && it.groupId > 0 }
             else -> bookGroups.filter { it.parentId == groupId }
         }
     }
