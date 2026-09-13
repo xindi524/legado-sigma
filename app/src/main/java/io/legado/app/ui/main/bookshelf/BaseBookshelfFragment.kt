@@ -25,6 +25,7 @@ import io.legado.app.data.entities.BookGroup
 import io.legado.app.databinding.DialogBookshelfConfigBinding
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.DirectLinkUpload
+import io.legado.app.help.GroupChangeNotifier
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.ui.about.AppLogDialog
@@ -167,8 +168,24 @@ abstract class BaseBookshelfFragment(layoutId: Int) : VMBaseFragment<BookshelfVi
                 waitDialog.setText("添加中... ($count)")
             }
         }
-        // F1 嵌套分组：分组数据变更后强制重新拉取分组列表（修复LiveData未推送导致书架不刷新）
+        // F1 嵌套分组：注册分组变更直调回调（同步刷新，主通道）
+        GroupChangeNotifier.register {
+            refreshGroupData()
+        }
+        // 事件广播作为双保险（防时序竞态：立即+延迟补发）
         observeEvent<String>(EventBus.BOOK_GROUP_CHANGED) {
+            refreshGroupData()
+        }
+        observeEvent<String>(EventBus.BOOK_GROUP_CHANGED_DELAYED) {
+            refreshGroupData()
+        }
+    }
+
+    /**
+     * F1 嵌套分组：分组数据变更后的刷新入口，子类可扩展
+     */
+    open fun refreshGroupData() {
+        if (viewLifecycleOwnerLiveData.value != null) {
             initBookGroupData()
         }
     }
