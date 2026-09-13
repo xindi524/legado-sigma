@@ -321,5 +321,13 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         observeEvent<String>(EventBus.BOOKSHELF_REFRESH) {
             booksAdapter.notifyDataSetChanged()
         }
+        // F1 嵌套分组：分组变更后，当前视图的组被删则回根部，并重启书籍查询
+        observeEvent<String>(EventBus.BOOK_GROUP_CHANGED) {
+            if (groupId > 0 && appDb.bookGroupDao.getByID(groupId) == null) {
+                groupId = BookGroup.IdRoot
+                groupStack.clear()
+            }
+            initBooksData()
+        }
     }
 }
