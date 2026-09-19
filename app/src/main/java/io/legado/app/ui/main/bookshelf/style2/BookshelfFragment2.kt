@@ -143,17 +143,16 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
     }
 
     override fun upGroup(data: List<BookGroup>) {
-        if (data != bookGroups) {
-            bookGroups = data
-            booksAdapter.updateItems(groupId)
-            itemCount = getItemCount()
-            val spanCount = bookshelfLayout
-            if (spanCount >= 2) {
-                totalRows = if (itemCount % spanCount == 0) itemCount / spanCount else itemCount / spanCount + 1
-            }
-            binding.tvEmptyMsg.isGone = itemCount > 0
-            binding.refreshLayout.isEnabled = enableRefresh && itemCount > 0
+        // F1 嵌套分组：无条件应用最新分组数据（移除相等判断，排除一切跳过刷新的可能）
+        bookGroups = data
+        booksAdapter.updateItems(groupId)
+        itemCount = getItemCount()
+        val spanCount = bookshelfLayout
+        if (spanCount >= 2) {
+            totalRows = if (itemCount % spanCount == 0) itemCount / spanCount else itemCount / spanCount + 1
         }
+        binding.tvEmptyMsg.isGone = itemCount > 0
+        binding.refreshLayout.isEnabled = enableRefresh && itemCount > 0
     }
 
     override fun upSort() {
