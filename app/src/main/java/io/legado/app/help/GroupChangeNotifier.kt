@@ -1,6 +1,5 @@
 package io.legado.app.help
 
-import io.legado.app.constant.AppLog
 import java.lang.ref.WeakReference
 
 /**
@@ -18,11 +17,9 @@ object GroupChangeNotifier {
     }
 
     fun notifyChanged() {
-        AppLog.put("F1诊断: GroupChangeNotifier.notifyChanged 开始")
         listeners.removeAll { it.get() == null }
         listeners.forEach {
             try {
-                AppLog.put("F1诊断: 直调书架刷新回调")
                 it.get()?.invoke()
             } catch (e: Exception) {
                 e.printStackTrace()
