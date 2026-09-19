@@ -228,7 +228,6 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
                 AppLog.put("书架更新出错", it)
             }.conflate().flowOn(Dispatchers.Default).collect { list ->
                 try {
-                    AppLog.put("F1诊断: initBooksData 收到 ${list.size} 本书 groupId=$groupId")
                     books = list
                     booksAdapter.updateItems(groupId)
                     itemCount = getItemCount()
@@ -374,7 +373,6 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
 
     // F1 嵌套分组：分组变更直调刷新入口（含当前视图组被删时的回根部保护）
     override fun refreshGroupData() {
-        AppLog.put("F1诊断: Fragment2.refreshGroupData groupId=$groupId")
         super.refreshGroupData()
         if (viewLifecycleOwnerLiveData.value != null) {
             if (groupId > 0 && appDb.bookGroupDao.getByID(groupId) == null) {
@@ -382,13 +380,9 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
                 groupStack.clear()
             }
             initBooksData()
-            // F1: 数据已确认新鲜送达但diff未应用变化，强制全量重绘兜底
-            try {
-                binding.rvBookshelf.post {
-                    booksAdapter.notifyDataSetChanged()
-                }
-            } catch (e: Exception) {
-                AppLog.put("F1诊断: notifyDataSetChanged失败\n${e.localizedMessage}", e)
+            // F1: 强制全量重绘兜底
+            binding.rvBookshelf.post {
+                booksAdapter.notifyDataSetChanged()
             }
         }
     }
