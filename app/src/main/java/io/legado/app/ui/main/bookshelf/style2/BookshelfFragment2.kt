@@ -3,9 +3,14 @@ package io.legado.app.ui.main.bookshelf.style2
 import android.annotation.SuppressLint
 import android.graphics.Rect
 import android.os.Bundle
+import android.text.TextUtils
+import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
+import android.widget.TextView
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.appcompat.widget.SearchView
+import androidx.appcompat.widget.Toolbar
 import androidx.core.view.isGone
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -29,6 +34,7 @@ import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.ui.main.bookshelf.BaseBookshelfFragment
 import io.legado.app.utils.cnCompare
+import io.legado.app.utils.dpToPx
 import io.legado.app.utils.flowWithLifecycleAndDatabaseChangeFirst
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.setEdgeEffectColor
@@ -71,6 +77,8 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
     private var bookGroups: List<BookGroup> = emptyList()
     // F1 嵌套分组：导航栈，保存从根部进入当前分组的层级链
     private val groupStack = ArrayDeque<Long>()
+    // F1 嵌套分组：居中标题控件（覆盖原生左对齐 title）
+    private var centerTitleView: TextView? = null
     private var booksFlowJob: Job? = null
     override var groupId = BookGroup.IdRoot
     override var books: List<Book> = emptyList()
@@ -84,6 +92,8 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         setSupportToolbar(binding.titleBar.toolbar)
         // F1 嵌套分组：标题栏返回按钮，点击逐级回退（小窗模式下无侧滑手势也能退出分组）
         binding.titleBar.setNavigationOnClickListener { back() }
+        // F1 嵌套分组：标题居中样式（根部"书架"与分组内文件夹名统一居中）
+        setupCenterTitle()
         initRecyclerView()
         initBookGroupData()
         initBooksData()
@@ -168,7 +178,8 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         upBackIcon()
         if (groupId == BookGroup.IdRoot) {
             if (isAdded) {
-                binding.titleBar.title = getString(R.string.bookshelf)
+                // F1: 根部保留原版样式（左对齐"书架"）
+                upCenterTitle(null)
                 binding.refreshLayout.isEnabled = true
                 enableRefresh = true
             }
@@ -176,7 +187,8 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
             bookGroups.firstOrNull {
                 groupId == it.groupId
             }?.let {
-                binding.titleBar.title = "${getString(R.string.bookshelf)}(${it.groupName})"
+                // F1 嵌套分组：分组内直接显示文件夹名（居中）
+                upCenterTitle(it.groupName)
                 binding.refreshLayout.isEnabled = it.enableRefresh
                 enableRefresh = it.enableRefresh
                 onlyUpdateRead = it.onlyUpdateRead
@@ -254,14 +266,51 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         return false
     }
 
-    // F1 嵌套分组：返回按钮显隐与染色（跟随主题文字色，明暗主题均可见）
+    // F1 嵌套分组：返回按钮显隐与染色（18dp 细线箭头，跟随主题文字色）
     private fun upBackIcon() {
         binding.titleBar.toolbar.navigationIcon = if (groupId == BookGroup.IdRoot) {
             null
         } else {
-            AppCompatResources.getDrawable(requireContext(), R.drawable.ic_back)?.apply {
+            AppCompatResources.getDrawable(requireContext(), R.drawable.ic_group_back)?.apply {
                 setTint(primaryTextColor)
             }
+        }
+    }
+
+    // F1 嵌套分组：居中标题——隐藏原生左对齐 title，加一个水平居中的 TextView
+    private fun setupCenterTitle() {
+        centerTitleView?.let { binding.titleBar.toolbar.removeView(it) }
+        binding.titleBar.toolbar.title = null
+        centerTitleView = TextView(requireContext()).apply {
+            setTextAppearance(androidx.appcompat.R.style.TextAppearance_AppCompat_Widget_ActionBar_Title)
+            setTextColor(primaryTextColor)
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            gravity = Gravity.CENTER
+            visibility = View.GONE
+        }.also { tv ->
+            val lp = Toolbar.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER
+            ).apply {
+                // 左右各留 48dp，避开返回箭头和右侧菜单图标，长名自动省略
+                marginStart = 48.dpToPx()
+                marginEnd = 48.dpToPx()
+            }
+            binding.titleBar.toolbar.addView(tv, lp)
+        }
+    }
+
+    // F1 嵌套分组：text=null 时为根部（恢复原生左对齐"书架"），否则分组内居中显示文件夹名
+    private fun upCenterTitle(text: CharSequence?) {
+        if (text == null) {
+            centerTitleView?.visibility = View.GONE
+            binding.titleBar.title = getString(R.string.bookshelf)
+        } else {
+            binding.titleBar.title = null
+            centerTitleView?.visibility = View.VISIBLE
+            centerTitleView?.text = text
         }
     }
 
