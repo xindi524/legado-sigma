@@ -3,10 +3,7 @@ package io.legado.app.ui.main.bookshelf.style2
 import android.annotation.SuppressLint
 import android.graphics.Rect
 import android.os.Bundle
-import android.text.TextUtils
-import android.view.Gravity
 import android.view.View
-import android.view.ViewGroup
 import android.widget.TextView
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.appcompat.widget.SearchView
@@ -34,7 +31,6 @@ import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.ui.main.bookshelf.BaseBookshelfFragment
 import io.legado.app.utils.cnCompare
-import io.legado.app.utils.dpToPx
 import io.legado.app.utils.flowWithLifecycleAndDatabaseChangeFirst
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.setEdgeEffectColor
@@ -77,8 +73,8 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
     private var bookGroups: List<BookGroup> = emptyList()
     // F1 嵌套分组：导航栈，保存从根部进入当前分组的层级链
     private val groupStack = ArrayDeque<Long>()
-    // F1 嵌套分组：居中标题控件（覆盖原生左对齐 title）
-    private var centerTitleView: TextView? = null
+    // F1 嵌套分组：原生标题 TextView（Toolbar 内部控件，反射获取；分组内平移到屏幕居中）
+    private var nativeTitleView: TextView? = null
     private var booksFlowJob: Job? = null
     override var groupId = BookGroup.IdRoot
     override var books: List<Book> = emptyList()
@@ -92,8 +88,6 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         setSupportToolbar(binding.titleBar.toolbar)
         // F1 嵌套分组：标题栏返回按钮，点击逐级回退（小窗模式下无侧滑手势也能退出分组）
         binding.titleBar.setNavigationOnClickListener { back() }
-        // F1 嵌套分组：标题居中样式（根部"书架"与分组内文件夹名统一居中）
-        setupCenterTitle()
         initRecyclerView()
         initBookGroupData()
         initBooksData()
@@ -277,51 +271,36 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         }
     }
 
-    // F1 嵌套分组：居中标题——隐藏原生左对齐 title，加一个水平居中的 TextView
-    private fun setupCenterTitle() {
-        centerTitleView?.let { binding.titleBar.toolbar.removeView(it) }
-        binding.titleBar.toolbar.title = null
-        centerTitleView = TextView(requireContext()).apply {
-            // 与原生 Toolbar title 使用同一个样式（字号/字重/字体族完全一致，和根部"书架"无差异）
-            setTextAppearance(androidx.appcompat.R.style.TextAppearance_Widget_AppCompat_Toolbar_Title)
-            setTextColor(primaryTextColor)
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
-            gravity = Gravity.CENTER
-            // 超长文件夹名限宽省略，不与左右图标相撞
-            maxWidth = 200.dpToPx()
-        }.also { tv ->
-            val lp = Toolbar.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.CENTER
-            )
-            binding.titleBar.toolbar.addView(tv, lp)
+    // F1 嵌套分组：反射获取 Toolbar 原生标题 TextView（布局 xml 的 title="书架" 已确保它被创建）
+    private fun findNativeTitle(): TextView? {
+        nativeTitleView?.let { return it }
+        return try {
+            val f = Toolbar::class.java.getDeclaredField("mTitleTextView")
+            f.isAccessible = true
+            (f.get(binding.titleBar.toolbar) as? TextView)?.also { nativeTitleView = it }
+        } catch (e: Exception) {
+            AppLog.put("F1: 反射读取原生标题失败 ${e.localizedMessage}")
+            null
         }
     }
 
-    // F1 嵌套分组：强制把居中标题校正到"屏幕绝对中心"
-    // （Toolbar 对子 View 的 gravity 计算会把左右图标占位算进去，导致相对"空白区"居中而偏左，
-    //   这里布局完成后测量实际位置，用 translationX 无副作用地拉回屏幕正中）
-    private fun forceCenterTitle() {
-        val tv = centerTitleView ?: return
-        val toolbar = binding.titleBar.toolbar
-        val offset = toolbar.width / 2f - (tv.x + tv.width / 2f)
-        if (offset != 0f) {
-            tv.translationX += offset
-        }
-    }
-
-    // F1 嵌套分组：text=null 时为根部（恢复原生左对齐"书架"），否则分组内居中显示文件夹名
+    // F1 嵌套分组：text=null 时为根部（原生"书架"左对齐原样），
+    // 否则分组内显示文件夹名——用原生 title 控件平移到屏幕绝对居中（样式与"书架"天然一致）
     private fun upCenterTitle(text: CharSequence?) {
+        val toolbar = binding.titleBar.toolbar
         if (text == null) {
-            centerTitleView?.visibility = View.GONE
-            binding.titleBar.title = getString(R.string.bookshelf)
+            toolbar.title = getString(R.string.bookshelf)
+            nativeTitleView?.translationX = 0f
         } else {
-            binding.titleBar.title = null
-            centerTitleView?.visibility = View.VISIBLE
-            centerTitleView?.text = text
-            centerTitleView?.post { forceCenterTitle() }
+            toolbar.title = text
+            findNativeTitle()?.let { tv ->
+                tv.post {
+                    // 重置后测量当前布局位置，平移到屏幕正中
+                    tv.translationX = 0f
+                    val offset = toolbar.width / 2f - (tv.x + tv.width / 2f)
+                    tv.translationX = offset
+                }
+            }
         }
     }
 
