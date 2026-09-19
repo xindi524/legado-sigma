@@ -282,7 +282,8 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         centerTitleView?.let { binding.titleBar.toolbar.removeView(it) }
         binding.titleBar.toolbar.title = null
         centerTitleView = TextView(requireContext()).apply {
-            setTextAppearance(androidx.appcompat.R.style.TextAppearance_AppCompat_Widget_ActionBar_Title)
+            // 与原生 Toolbar title 使用同一个样式（字号/字重/字体族完全一致，和根部"书架"无差异）
+            setTextAppearance(androidx.appcompat.R.style.TextAppearance_Widget_AppCompat_Toolbar_Title)
             setTextColor(primaryTextColor)
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
