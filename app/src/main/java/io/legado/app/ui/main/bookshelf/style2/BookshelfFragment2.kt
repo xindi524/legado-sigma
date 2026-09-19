@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.graphics.Rect
 import android.os.Bundle
 import android.view.View
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.appcompat.widget.SearchView
 import androidx.core.view.isGone
 import androidx.lifecycle.Lifecycle
@@ -22,6 +23,7 @@ import io.legado.app.databinding.FragmentBookshelf2Binding
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.theme.accentColor
 import io.legado.app.lib.theme.primaryColor
+import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.ui.book.group.GroupEditDialog
 import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.ui.book.search.SearchActivity
@@ -80,6 +82,8 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         setSupportToolbar(binding.titleBar.toolbar)
+        // F1 嵌套分组：标题栏返回按钮，点击逐级回退（小窗模式下无侧滑手势也能退出分组）
+        binding.titleBar.setNavigationOnClickListener { back() }
         initRecyclerView()
         initBookGroupData()
         initBooksData()
@@ -160,6 +164,8 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
     }
 
     private fun initBooksData() {
+        // F1 嵌套分组：返回按钮显隐（根部隐藏，子分组内显示）
+        upBackIcon()
         if (groupId == BookGroup.IdRoot) {
             if (isAdded) {
                 binding.titleBar.title = getString(R.string.bookshelf)
@@ -246,6 +252,17 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
             return true
         }
         return false
+    }
+
+    // F1 嵌套分组：返回按钮显隐与染色（跟随主题文字色，明暗主题均可见）
+    private fun upBackIcon() {
+        binding.titleBar.toolbar.navigationIcon = if (groupId == BookGroup.IdRoot) {
+            null
+        } else {
+            AppCompatResources.getDrawable(requireContext(), R.drawable.ic_back)?.apply {
+                setTint(primaryTextColor)
+            }
+        }
     }
 
     override fun onQueryTextSubmit(query: String?): Boolean {
