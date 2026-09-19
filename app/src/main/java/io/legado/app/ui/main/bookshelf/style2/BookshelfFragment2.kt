@@ -287,18 +287,27 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             gravity = Gravity.CENTER
-            visibility = View.GONE
+            // 超长文件夹名限宽省略，不与左右图标相撞
+            maxWidth = 200.dpToPx()
         }.also { tv ->
             val lp = Toolbar.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.CENTER
-            ).apply {
-                // 左右各留 48dp，避开返回箭头和右侧菜单图标，长名自动省略
-                marginStart = 48.dpToPx()
-                marginEnd = 48.dpToPx()
-            }
+            )
             binding.titleBar.toolbar.addView(tv, lp)
+        }
+    }
+
+    // F1 嵌套分组：强制把居中标题校正到"屏幕绝对中心"
+    // （Toolbar 对子 View 的 gravity 计算会把左右图标占位算进去，导致相对"空白区"居中而偏左，
+    //   这里布局完成后测量实际位置，用 translationX 无副作用地拉回屏幕正中）
+    private fun forceCenterTitle() {
+        val tv = centerTitleView ?: return
+        val toolbar = binding.titleBar.toolbar
+        val offset = toolbar.width / 2f - (tv.x + tv.width / 2f)
+        if (offset != 0f) {
+            tv.translationX += offset
         }
     }
 
@@ -311,6 +320,7 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
             binding.titleBar.title = null
             centerTitleView?.visibility = View.VISIBLE
             centerTitleView?.text = text
+            centerTitleView?.post { forceCenterTitle() }
         }
     }
 
