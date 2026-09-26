@@ -20,6 +20,11 @@
             app:showAsAction="never" />
 
         <item
+            android:id="@+id/menu_book_toc_regex"
+            android:title="本书正则"
+            app:showAsAction="never" />
+
+        <item
             android:id="@+id/menu_split_long_chapter"
             android:checkable="true"
             android:title="@string/split_long_chapter"
