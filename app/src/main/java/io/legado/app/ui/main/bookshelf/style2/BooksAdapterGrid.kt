@@ -214,13 +214,15 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
             upCover(item)
         }
 
-        // F2 分组拼图：自定义封面 > 组内书封面拼图(最近读优先,异步拼合成单图) > 组名文字封面
+        // F2 分组拼图：拼图素材 = 直属书封面(最近读优先) + 直属子分组封面(子组自定义封面,无则系统默认封面)
+        // 全空组显示组名文字封面
         fun upCover(item: BookGroup) = binding.run {
             ivCover.tag = item.groupId
             val preview = appDb.bookDao.getBooksForGroupPreview(item.groupId, 4)
+            val childGroups = appDb.bookGroupDao.getByParent(item.groupId)
             if (!item.cover.isNullOrBlank()) {
                 ivCover.load(item.cover)
-            } else if (preview.isEmpty()) {
+            } else if (preview.isEmpty() && childGroups.isEmpty()) {
                 // 空组：生成"组名文字封面"（主题底色+组名居中），醒目且与整体风格统一
                 val iv = ivCover
                 val ctx = iv.context
@@ -242,7 +244,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                 c.drawText(name, 150f, 215f, p)
                 iv.setImageBitmap(bmp)
             } else {
-                // IO 线程把前4本封面拼成单图（间隙舒展、底色跟随主题），回主线程校验 tag 后显示
+                // IO 线程拼合：直属书在前，直属子分组在后（子组封面=自定义>系统默认），共4格
                 val key = item.groupId
                 val iv = ivCover
                 val ctx = iv.context
@@ -250,12 +252,26 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     val h = 400
                     val w = h * 3 / 4
                     val bgColor = ctx.primaryColor
-                    val bitmaps = preview.take(4).mapNotNull { b ->
+                    val bitmaps = mutableListOf<Bitmap>()
+                    preview.take(4).forEach { b ->
                         try {
-                            Glide.with(ctx).asBitmap().load(b.getDisplayCover())
-                                .centerCrop().submit(w / 2, h / 2).get(10, TimeUnit.SECONDS)
+                            bitmaps.add(
+                                Glide.with(ctx).asBitmap().load(b.getDisplayCover())
+                                    .centerCrop().submit(w / 2, h / 2).get(10, TimeUnit.SECONDS)
+                            )
                         } catch (e: Exception) {
-                            null
+                        }
+                    }
+                    childGroups.forEach { cg ->
+                        if (bitmaps.size < 4) {
+                            try {
+                                val model: Any = cg.cover ?: R.drawable.image_cover_default
+                                bitmaps.add(
+                                    Glide.with(ctx).asBitmap().load(model)
+                                        .centerCrop().submit(w / 2, h / 2).get(10, TimeUnit.SECONDS)
+                                )
+                            } catch (e: Exception) {
+                            }
                         }
                     }
                     if (bitmaps.isEmpty()) return@launch
@@ -263,17 +279,12 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     mosaic.eraseColor(bgColor)
                     val canvas = Canvas(mosaic)
                     val gap = 14f
-                    if (bitmaps.size == 1) {
-                        // 单书：整图铺满
-                        canvas.drawBitmap(bitmaps[0], null, RectF(0f, 0f, w.toFloat(), h.toFloat()), null)
-                    } else {
-                        val cw = w / 2f
-                        val ch = h / 2f
-                        bitmaps.forEachIndexed { i, bmp ->
-                            val l = (i % 2) * cw
-                            val t = (i / 2) * ch
-                            canvas.drawBitmap(bmp, null, RectF(l + gap / 2, t + gap / 2, l + cw - gap / 2, t + ch - gap / 2), null)
-                        }
+                    val cw = w / 2f
+                    val ch = h / 2f
+                    bitmaps.forEachIndexed { i, bmp ->
+                        val l = (i % 2) * cw
+                        val t = (i / 2) * ch
+                        canvas.drawBitmap(bmp, null, RectF(l + gap / 2, t + gap / 2, l + cw - gap / 2, t + ch - gap / 2), null)
                     }
                     withContext(Dispatchers.Main) {
                         if (iv.tag == key) {
@@ -326,13 +337,15 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
             upCover(item)
         }
 
-        // F2 分组拼图：自定义封面 > 组内书封面拼图(最近读优先,异步拼合成单图) > 组名文字封面
+        // F2 分组拼图：拼图素材 = 直属书封面(最近读优先) + 直属子分组封面(子组自定义封面,无则系统默认封面)
+        // 全空组显示组名文字封面
         fun upCover(item: BookGroup) = binding.run {
             ivCover.tag = item.groupId
             val preview = appDb.bookDao.getBooksForGroupPreview(item.groupId, 4)
+            val childGroups = appDb.bookGroupDao.getByParent(item.groupId)
             if (!item.cover.isNullOrBlank()) {
                 ivCover.load(item.cover)
-            } else if (preview.isEmpty()) {
+            } else if (preview.isEmpty() && childGroups.isEmpty()) {
                 // 空组：生成"组名文字封面"（主题底色+组名居中），醒目且与整体风格统一
                 val iv = ivCover
                 val ctx = iv.context
@@ -354,7 +367,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                 c.drawText(name, 150f, 215f, p)
                 iv.setImageBitmap(bmp)
             } else {
-                // IO 线程把前4本封面拼成单图（间隙舒展、底色跟随主题），回主线程校验 tag 后显示
+                // IO 线程拼合：直属书在前，直属子分组在后（子组封面=自定义>系统默认），共4格
                 val key = item.groupId
                 val iv = ivCover
                 val ctx = iv.context
@@ -362,12 +375,26 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     val h = 400
                     val w = h * 3 / 4
                     val bgColor = ctx.primaryColor
-                    val bitmaps = preview.take(4).mapNotNull { b ->
+                    val bitmaps = mutableListOf<Bitmap>()
+                    preview.take(4).forEach { b ->
                         try {
-                            Glide.with(ctx).asBitmap().load(b.getDisplayCover())
-                                .centerCrop().submit(w / 2, h / 2).get(10, TimeUnit.SECONDS)
+                            bitmaps.add(
+                                Glide.with(ctx).asBitmap().load(b.getDisplayCover())
+                                    .centerCrop().submit(w / 2, h / 2).get(10, TimeUnit.SECONDS)
+                            )
                         } catch (e: Exception) {
-                            null
+                        }
+                    }
+                    childGroups.forEach { cg ->
+                        if (bitmaps.size < 4) {
+                            try {
+                                val model: Any = cg.cover ?: R.drawable.image_cover_default
+                                bitmaps.add(
+                                    Glide.with(ctx).asBitmap().load(model)
+                                        .centerCrop().submit(w / 2, h / 2).get(10, TimeUnit.SECONDS)
+                                )
+                            } catch (e: Exception) {
+                            }
                         }
                     }
                     if (bitmaps.isEmpty()) return@launch
@@ -375,17 +402,12 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     mosaic.eraseColor(bgColor)
                     val canvas = Canvas(mosaic)
                     val gap = 14f
-                    if (bitmaps.size == 1) {
-                        // 单书：整图铺满
-                        canvas.drawBitmap(bitmaps[0], null, RectF(0f, 0f, w.toFloat(), h.toFloat()), null)
-                    } else {
-                        val cw = w / 2f
-                        val ch = h / 2f
-                        bitmaps.forEachIndexed { i, bmp ->
-                            val l = (i % 2) * cw
-                            val t = (i / 2) * ch
-                            canvas.drawBitmap(bmp, null, RectF(l + gap / 2, t + gap / 2, l + cw - gap / 2, t + ch - gap / 2), null)
-                        }
+                    val cw = w / 2f
+                    val ch = h / 2f
+                    bitmaps.forEachIndexed { i, bmp ->
+                        val l = (i % 2) * cw
+                        val t = (i / 2) * ch
+                        canvas.drawBitmap(bmp, null, RectF(l + gap / 2, t + gap / 2, l + cw - gap / 2, t + ch - gap / 2), null)
                     }
                     withContext(Dispatchers.Main) {
                         if (iv.tag == key) {
