@@ -249,7 +249,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                 val iv = ivCover
                 val ctx = iv.context
                 GlobalScope.launch(Dispatchers.IO) {
-                    val h = 400
+                    val h = 480
                     val w = h * 3 / 4
                     val bgColor = ctx.primaryColor
                     // 书与子分组按最后阅读时间混排（子分组时间=组内书的最新阅读时间，真进书阅读才更新），取前4
@@ -284,13 +284,16 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     val mosaic = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
                     mosaic.eraseColor(bgColor)
                     val canvas = Canvas(mosaic)
-                    val gap = 14f
+                    // 仿 MD3：垂直方向满铺无缝，水平仅中缝极细——格子最大化
+                    val gapH = 6f
                     val cw = w / 2f
                     val ch = h / 2f
                     bitmaps.forEachIndexed { i, bmp ->
                         val l = (i % 2) * cw
                         val t = (i / 2) * ch
-                        canvas.drawBitmap(bmp, null, RectF(l + gap / 2, t + gap / 2, l + cw - gap / 2, t + ch - gap / 2), null)
+                        val left = if (i % 2 == 0) l else l + gapH / 2
+                        val right = if (i % 2 == 0) l + cw - gapH / 2 else l + cw
+                        canvas.drawBitmap(bmp, null, RectF(left, t, right, t + ch), null)
                     }
                     withContext(Dispatchers.Main) {
                         if (iv.tag == key) {
@@ -378,7 +381,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                 val iv = ivCover
                 val ctx = iv.context
                 GlobalScope.launch(Dispatchers.IO) {
-                    val h = 400
+                    val h = 480
                     val w = h * 3 / 4
                     val bgColor = ctx.primaryColor
                     // 书与子分组按最后阅读时间混排（子分组时间=组内书的最新阅读时间，真进书阅读才更新），取前4
@@ -413,13 +416,16 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     val mosaic = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
                     mosaic.eraseColor(bgColor)
                     val canvas = Canvas(mosaic)
-                    val gap = 14f
+                    // 仿 MD3：垂直方向满铺无缝，水平仅中缝极细——格子最大化
+                    val gapH = 6f
                     val cw = w / 2f
                     val ch = h / 2f
                     bitmaps.forEachIndexed { i, bmp ->
                         val l = (i % 2) * cw
                         val t = (i / 2) * ch
-                        canvas.drawBitmap(bmp, null, RectF(l + gap / 2, t + gap / 2, l + cw - gap / 2, t + ch - gap / 2), null)
+                        val left = if (i % 2 == 0) l else l + gapH / 2
+                        val right = if (i % 2 == 0) l + cw - gapH / 2 else l + cw
+                        canvas.drawBitmap(bmp, null, RectF(left, t, right, t + ch), null)
                     }
                     withContext(Dispatchers.Main) {
                         if (iv.tag == key) {
