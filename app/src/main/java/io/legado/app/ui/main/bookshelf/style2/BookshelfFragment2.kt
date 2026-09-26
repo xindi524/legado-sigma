@@ -259,12 +259,12 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
         return false
     }
 
-    // F1 嵌套分组：返回按钮显隐与染色（18dp 细线箭头，跟随主题文字色）
+    // F1 嵌套分组：返回按钮显隐与染色（订阅源页同款 Material 返回箭头，跟随主题文字色）
     private fun upBackIcon() {
         binding.titleBar.toolbar.navigationIcon = if (groupId == BookGroup.IdRoot) {
             null
         } else {
-            AppCompatResources.getDrawable(requireContext(), R.drawable.ic_group_back)?.apply {
+            AppCompatResources.getDrawable(requireContext(), androidx.appcompat.R.drawable.abc_ic_ab_back_material)?.apply {
                 setTint(primaryTextColor)
             }
         }
