@@ -575,7 +575,7 @@ class ReadBookActivity : BaseReadBookActivity(),
 
             R.id.menu_log -> showDialogFragment<AppLogDialog>()
             R.id.menu_toc_regex -> showDialogFragment(
-                TxtTocRuleDialog(ReadBook.book?.tocUrl)
+                TxtTocRuleDialog(ReadBook.book)
             )
 
             R.id.menu_reverse_content -> ReadBook.book?.let {
@@ -1561,11 +1561,8 @@ class ReadBookActivity : BaseReadBookActivity(),
      */
     override fun onDialogDismissed(dialogId: Int) = Unit
 
-    override fun onTocRegexDialogResult(tocRegex: String) {
-        ReadBook.book?.let {
-            it.tocUrl = tocRegex
-            loadChapterList(it)
-        }
+    override fun onTocRegexDialogResult(book: Book?) {
+        book?.let { loadChapterList(it) }
     }
 
     private fun sureSyncProgress(progress: BookProgress) {
