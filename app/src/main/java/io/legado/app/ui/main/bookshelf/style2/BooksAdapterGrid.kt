@@ -211,7 +211,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
             } else if (preview.isEmpty()) {
                 ivCover.visible()
                 llMosaic.gone()
-                ivCover.load(null)
+                ivCover.load(item.cover)
             } else {
                 ivCover.gone()
                 llMosaic.visible()
@@ -280,7 +280,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
             } else if (preview.isEmpty()) {
                 ivCover.visible()
                 llMosaic.gone()
-                ivCover.load(null)
+                ivCover.load(item.cover)
             } else {
                 ivCover.gone()
                 llMosaic.visible()
