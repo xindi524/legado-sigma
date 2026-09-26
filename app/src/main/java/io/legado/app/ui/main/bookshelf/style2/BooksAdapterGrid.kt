@@ -3,6 +3,7 @@ package io.legado.app.ui.main.bookshelf.style2
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Bundle
 import android.view.ViewGroup
@@ -17,6 +18,8 @@ import io.legado.app.databinding.ItemBookshelfGridBinding
 import io.legado.app.databinding.ItemBookshelfGridGroup2Binding
 import io.legado.app.databinding.ItemBookshelfGridGroupBinding
 import io.legado.app.help.book.isLocal
+import io.legado.app.lib.theme.primaryColor
+import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.help.config.AppConfig
 import io.legado.app.utils.gone
 import io.legado.app.utils.invisible
@@ -211,23 +214,42 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
             upCover(item)
         }
 
-        // F2 分组拼图：自定义封面 > 组内书封面拼图(最近读优先,异步拼合成单图) > 默认封面占位
+        // F2 分组拼图：自定义封面 > 组内书封面拼图(最近读优先,异步拼合成单图) > 组名文字封面
         fun upCover(item: BookGroup) = binding.run {
             ivCover.tag = item.groupId
             val preview = appDb.bookDao.getBooksForGroupPreview(item.groupId, 4)
             if (!item.cover.isNullOrBlank()) {
                 ivCover.load(item.cover)
             } else if (preview.isEmpty()) {
-                // load(null) 会让 Glide 清空图像，这里强制设置默认封面
-                ivCover.setImageResource(R.drawable.image_cover_default)
+                // 空组：生成"组名文字封面"（主题底色+组名居中），醒目且与整体风格统一
+                val iv = ivCover
+                val ctx = iv.context
+                val bmp = Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888)
+                val c = Canvas(bmp)
+                c.drawColor(ctx.primaryColor)
+                val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = ctx.primaryTextColor
+                    textSize = 44f
+                    textAlign = Paint.Align.CENTER
+                }
+                var name = item.groupName
+                while (name.isNotEmpty() && p.measureText(name) > 240f) {
+                    name = name.dropLast(1)
+                }
+                if (name != item.groupName && name.length > 1) {
+                    name = name.dropLast(1) + "…"
+                }
+                c.drawText(name, 150f, 215f, p)
+                iv.setImageBitmap(bmp)
             } else {
-                // IO 线程把前4本封面拼成 2x2 单图，回主线程校验 tag 后显示（防复用串图）
+                // IO 线程把前4本封面拼成单图（间隙舒展、底色跟随主题），回主线程校验 tag 后显示
                 val key = item.groupId
                 val iv = ivCover
                 val ctx = iv.context
                 GlobalScope.launch(Dispatchers.IO) {
                     val h = 400
                     val w = h * 3 / 4
+                    val bgColor = ctx.primaryColor
                     val bitmaps = preview.take(4).mapNotNull { b ->
                         try {
                             Glide.with(ctx).asBitmap().load(b.getDisplayCover())
@@ -238,15 +260,20 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     }
                     if (bitmaps.isEmpty()) return@launch
                     val mosaic = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-                    mosaic.eraseColor(0xFFE0E0E0.toInt())
+                    mosaic.eraseColor(bgColor)
                     val canvas = Canvas(mosaic)
-                    val gap = 4f
-                    val cw = w / 2f
-                    val ch = h / 2f
-                    bitmaps.forEachIndexed { i, bmp ->
-                        val l = (i % 2) * cw
-                        val t = (i / 2) * ch
-                        canvas.drawBitmap(bmp, null, RectF(l + gap / 2, t + gap / 2, l + cw - gap / 2, t + ch - gap / 2), null)
+                    val gap = 14f
+                    if (bitmaps.size == 1) {
+                        // 单书：整图铺满
+                        canvas.drawBitmap(bitmaps[0], null, RectF(0f, 0f, w.toFloat(), h.toFloat()), null)
+                    } else {
+                        val cw = w / 2f
+                        val ch = h / 2f
+                        bitmaps.forEachIndexed { i, bmp ->
+                            val l = (i % 2) * cw
+                            val t = (i / 2) * ch
+                            canvas.drawBitmap(bmp, null, RectF(l + gap / 2, t + gap / 2, l + cw - gap / 2, t + ch - gap / 2), null)
+                        }
                     }
                     withContext(Dispatchers.Main) {
                         if (iv.tag == key) {
@@ -299,23 +326,42 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
             upCover(item)
         }
 
-        // F2 分组拼图：自定义封面 > 组内书封面拼图(最近读优先,异步拼合成单图) > 默认封面占位
+        // F2 分组拼图：自定义封面 > 组内书封面拼图(最近读优先,异步拼合成单图) > 组名文字封面
         fun upCover(item: BookGroup) = binding.run {
             ivCover.tag = item.groupId
             val preview = appDb.bookDao.getBooksForGroupPreview(item.groupId, 4)
             if (!item.cover.isNullOrBlank()) {
                 ivCover.load(item.cover)
             } else if (preview.isEmpty()) {
-                // load(null) 会让 Glide 清空图像，这里强制设置默认封面
-                ivCover.setImageResource(R.drawable.image_cover_default)
+                // 空组：生成"组名文字封面"（主题底色+组名居中），醒目且与整体风格统一
+                val iv = ivCover
+                val ctx = iv.context
+                val bmp = Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888)
+                val c = Canvas(bmp)
+                c.drawColor(ctx.primaryColor)
+                val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = ctx.primaryTextColor
+                    textSize = 44f
+                    textAlign = Paint.Align.CENTER
+                }
+                var name = item.groupName
+                while (name.isNotEmpty() && p.measureText(name) > 240f) {
+                    name = name.dropLast(1)
+                }
+                if (name != item.groupName && name.length > 1) {
+                    name = name.dropLast(1) + "…"
+                }
+                c.drawText(name, 150f, 215f, p)
+                iv.setImageBitmap(bmp)
             } else {
-                // IO 线程把前4本封面拼成 2x2 单图，回主线程校验 tag 后显示（防复用串图）
+                // IO 线程把前4本封面拼成单图（间隙舒展、底色跟随主题），回主线程校验 tag 后显示
                 val key = item.groupId
                 val iv = ivCover
                 val ctx = iv.context
                 GlobalScope.launch(Dispatchers.IO) {
                     val h = 400
                     val w = h * 3 / 4
+                    val bgColor = ctx.primaryColor
                     val bitmaps = preview.take(4).mapNotNull { b ->
                         try {
                             Glide.with(ctx).asBitmap().load(b.getDisplayCover())
@@ -326,15 +372,20 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     }
                     if (bitmaps.isEmpty()) return@launch
                     val mosaic = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-                    mosaic.eraseColor(0xFFE0E0E0.toInt())
+                    mosaic.eraseColor(bgColor)
                     val canvas = Canvas(mosaic)
-                    val gap = 4f
-                    val cw = w / 2f
-                    val ch = h / 2f
-                    bitmaps.forEachIndexed { i, bmp ->
-                        val l = (i % 2) * cw
-                        val t = (i / 2) * ch
-                        canvas.drawBitmap(bmp, null, RectF(l + gap / 2, t + gap / 2, l + cw - gap / 2, t + ch - gap / 2), null)
+                    val gap = 14f
+                    if (bitmaps.size == 1) {
+                        // 单书：整图铺满
+                        canvas.drawBitmap(bitmaps[0], null, RectF(0f, 0f, w.toFloat(), h.toFloat()), null)
+                    } else {
+                        val cw = w / 2f
+                        val ch = h / 2f
+                        bitmaps.forEachIndexed { i, bmp ->
+                            val l = (i % 2) * cw
+                            val t = (i / 2) * ch
+                            canvas.drawBitmap(bmp, null, RectF(l + gap / 2, t + gap / 2, l + cw - gap / 2, t + ch - gap / 2), null)
+                        }
                     }
                     withContext(Dispatchers.Main) {
                         if (iv.tag == key) {
