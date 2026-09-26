@@ -517,7 +517,7 @@ class TextFile(private var book: Book) {
      * 所有正则的匹配点合并排序（正则顺序即优先级，同位置先到先得），标题取匹配文本；
      * 无匹配的区间自然并入相邻章节；首个匹配前的内容作为书名章
      */
-    private fun parseTocByRegexes(regexes: List<String>): Pair<ArrayList<BookChapter>, Long> {
+    private fun parseTocByRegexes(regexes: List<String>): Pair<ArrayList<BookChapter>, Int> {
         val content = LocalBook.getBookInputStream(book).use { bis ->
             String(bis.readBytes(), charset)
         }
