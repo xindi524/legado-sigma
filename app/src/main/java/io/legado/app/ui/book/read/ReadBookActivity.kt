@@ -1561,8 +1561,11 @@ class ReadBookActivity : BaseReadBookActivity(),
      */
     override fun onDialogDismissed(dialogId: Int) = Unit
 
-    override fun onTocRegexDialogResult(book: Book?) {
-        book?.let { loadChapterList(it) }
+    override fun onTocRegexDialogResult(tocRegex: String) {
+        ReadBook.book?.let {
+            it.tocUrl = tocRegex
+            loadChapterList(it)
+        }
     }
 
     private fun sureSyncProgress(progress: BookProgress) {
