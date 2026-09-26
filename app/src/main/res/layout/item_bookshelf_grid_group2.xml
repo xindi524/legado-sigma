@@ -65,7 +65,7 @@
                         android:baselineAligned="false"
                         android:orientation="horizontal">
 
-                        <io.legado.app.ui.widget.image.CoverImageView
+                        <androidx.appcompat.widget.AppCompatImageView
                             android:id="@+id/iv_mosaic1"
                             android:layout_width="0dp"
                             android:layout_height="match_parent"
@@ -74,7 +74,7 @@
                             android:src="@drawable/image_cover_default"
                             tools:ignore="UnusedAttribute" />
 
-                        <io.legado.app.ui.widget.image.CoverImageView
+                        <androidx.appcompat.widget.AppCompatImageView
                             android:id="@+id/iv_mosaic2"
                             android:layout_width="0dp"
                             android:layout_height="match_parent"
@@ -92,7 +92,7 @@
                         android:baselineAligned="false"
                         android:orientation="horizontal">
 
-                        <io.legado.app.ui.widget.image.CoverImageView
+                        <androidx.appcompat.widget.AppCompatImageView
                             android:id="@+id/iv_mosaic3"
                             android:layout_width="0dp"
                             android:layout_height="match_parent"
@@ -101,7 +101,7 @@
                             android:src="@drawable/image_cover_default"
                             tools:ignore="UnusedAttribute" />
 
-                        <io.legado.app.ui.widget.image.CoverImageView
+                        <androidx.appcompat.widget.AppCompatImageView
                             android:id="@+id/iv_mosaic4"
                             android:layout_width="0dp"
                             android:layout_height="match_parent"
