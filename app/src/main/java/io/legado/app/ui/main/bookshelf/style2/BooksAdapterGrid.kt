@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Bundle
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
+import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.databinding.ItemBookshelfGrid2Binding
@@ -197,7 +198,34 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                 tvName.visible()
                 tvName.text = item.groupName
             }
-            ivCover.load(item.cover)
+            upCover(item)
+        }
+
+        // F2 分组拼图：自定义封面 > 组内书封面拼图(最近读优先) > 默认封面占位
+        fun upCover(item: BookGroup) = binding.run {
+            val preview = appDb.bookDao.getBooksForGroupPreview(item.groupId, 4)
+            if (!item.cover.isNullOrBlank()) {
+                ivCover.visible()
+                llMosaic.gone()
+                ivCover.load(item.cover)
+            } else if (preview.isEmpty()) {
+                ivCover.visible()
+                llMosaic.gone()
+                ivCover.load(null)
+            } else {
+                ivCover.gone()
+                llMosaic.visible()
+                val views = listOf(ivMosaic1, ivMosaic2, ivMosaic3, ivMosaic4)
+                views.forEachIndexed { i, iv ->
+                    val book = preview.getOrNull(i)
+                    if (book == null) {
+                        iv.invisible()
+                    } else {
+                        iv.visible()
+                        iv.load(book, false)
+                    }
+                }
+            }
         }
 
         fun onBind(item: BookGroup, position: Int, payloads: MutableList<Any>) = binding.run {
@@ -209,7 +237,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     bundle.keySet().forEach {
                         when (it) {
                             "groupName" -> tvName.text = item.groupName
-                            "cover" -> ivCover.load(item.cover)
+                            "cover" -> upCover(item)
                         }
                     }
                 }
@@ -239,7 +267,34 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     tvName.text = it
                 }
             }
-            ivCover.load(item.cover)
+            upCover(item)
+        }
+
+        // F2 分组拼图：自定义封面 > 组内书封面拼图(最近读优先) > 默认封面占位
+        fun upCover(item: BookGroup) = binding.run {
+            val preview = appDb.bookDao.getBooksForGroupPreview(item.groupId, 4)
+            if (!item.cover.isNullOrBlank()) {
+                ivCover.visible()
+                llMosaic.gone()
+                ivCover.load(item.cover)
+            } else if (preview.isEmpty()) {
+                ivCover.visible()
+                llMosaic.gone()
+                ivCover.load(null)
+            } else {
+                ivCover.gone()
+                llMosaic.visible()
+                val views = listOf(ivMosaic1, ivMosaic2, ivMosaic3, ivMosaic4)
+                views.forEachIndexed { i, iv ->
+                    val book = preview.getOrNull(i)
+                    if (book == null) {
+                        iv.invisible()
+                    } else {
+                        iv.visible()
+                        iv.load(book, false)
+                    }
+                }
+            }
         }
 
         fun onBind(item: BookGroup, position: Int, payloads: MutableList<Any>) = binding.run {
@@ -258,7 +313,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                                     tvName.text = it
                                 }
                             }
-                            "cover" -> ivCover.load(item.cover)
+                            "cover" -> upCover(item)
                         }
                     }
                 }
