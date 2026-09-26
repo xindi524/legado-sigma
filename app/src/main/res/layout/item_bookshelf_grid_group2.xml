@@ -41,80 +41,6 @@
                 tools:ignore="UnusedAttribute,ImageContrastCheck"
                 tools:layout_editor_absoluteX="4dp" />
 
-            <FrameLayout
-                android:id="@+id/ll_mosaic"
-                android:layout_width="0dp"
-                android:layout_height="0dp"
-                android:layout_margin="4dp"
-                android:visibility="gone"
-                app:layout_constraintDimensionRatio="H,4:3"
-                app:layout_constraintTop_toTopOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:baselineAligned="false"
-                    android:orientation="vertical">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="0dp"
-                        android:layout_weight="1"
-                        android:baselineAligned="false"
-                        android:orientation="horizontal">
-
-                        <androidx.appcompat.widget.AppCompatImageView
-                            android:id="@+id/iv_mosaic1"
-                            android:layout_width="0dp"
-                            android:layout_height="match_parent"
-                            android:layout_margin="2dp"
-                            android:scaleType="centerCrop"
-                            android:src="@drawable/image_cover_default"
-                            tools:ignore="UnusedAttribute" />
-
-                        <androidx.appcompat.widget.AppCompatImageView
-                            android:id="@+id/iv_mosaic2"
-                            android:layout_width="0dp"
-                            android:layout_height="match_parent"
-                            android:layout_margin="2dp"
-                            android:scaleType="centerCrop"
-                            android:src="@drawable/image_cover_default"
-                            tools:ignore="UnusedAttribute" />
-
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="0dp"
-                        android:layout_weight="1"
-                        android:baselineAligned="false"
-                        android:orientation="horizontal">
-
-                        <androidx.appcompat.widget.AppCompatImageView
-                            android:id="@+id/iv_mosaic3"
-                            android:layout_width="0dp"
-                            android:layout_height="match_parent"
-                            android:layout_margin="2dp"
-                            android:scaleType="centerCrop"
-                            android:src="@drawable/image_cover_default"
-                            tools:ignore="UnusedAttribute" />
-
-                        <androidx.appcompat.widget.AppCompatImageView
-                            android:id="@+id/iv_mosaic4"
-                            android:layout_width="0dp"
-                            android:layout_height="match_parent"
-                            android:layout_margin="2dp"
-                            android:scaleType="centerCrop"
-                            android:src="@drawable/image_cover_default"
-                            tools:ignore="UnusedAttribute" />
-
-                    </LinearLayout>
-
-                </LinearLayout>
-
-            </FrameLayout>
 
             <TextView
                 android:id="@+id/tv_name"
@@ -133,12 +59,9 @@
                 android:paddingBottom="4dp"
                 android:paddingTop="8dp"
                 android:textSize="11sp"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="4dp"
-                android:layout_marginBottom="4dp"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintBottom_toBottomOf="@+id/iv_cover"
+                app:layout_constraintStart_toStartOf="@+id/iv_cover"
+                app:layout_constraintEnd_toEndOf="@+id/iv_cover"
                 tools:ignore="RtlHardcoded,RtlSymmetry" />
 
             <io.legado.app.ui.widget.text.BadgeView
