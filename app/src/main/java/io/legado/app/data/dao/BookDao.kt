@@ -75,6 +75,10 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE (`group` & :group) > 0")
     fun flowByUserGroup(group: Long): Flow<List<Book>>
 
+    // F2 分组拼图：取分组内最近阅读的前 N 本书作为拼图封面素材
+    @Query("SELECT * FROM books WHERE (`group` & :group) > 0 ORDER BY durChapterTime DESC LIMIT :limit")
+    fun getBooksForGroupPreview(group: Long, limit: Int): List<Book>
+
     // F1 嵌套分组：书架主页专用——显示所有未分组书（网络+本地合并），排除音频/视频/未入书架的书
     @Query(
         """
