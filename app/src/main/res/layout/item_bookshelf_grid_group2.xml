@@ -41,12 +41,13 @@
                 tools:ignore="UnusedAttribute,ImageContrastCheck"
                 tools:layout_editor_absoluteX="4dp" />
 
-            <io.legado.app.ui.widget.image.GroupMosaicLayout
+            <FrameLayout
                 android:id="@+id/ll_mosaic"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="0dp"
                 android:layout_margin="4dp"
                 android:visibility="gone"
+                app:layout_constraintDimensionRatio="H,4:3"
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent">
@@ -113,7 +114,7 @@
 
                 </LinearLayout>
 
-            </io.legado.app.ui.widget.image.GroupMosaicLayout>
+            </FrameLayout>
 
             <TextView
                 android:id="@+id/tv_name"
