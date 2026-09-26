@@ -1,9 +1,13 @@
 package io.legado.app.ui.main.bookshelf.style2
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.RectF
 import android.os.Bundle
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
@@ -11,13 +15,17 @@ import io.legado.app.databinding.ItemBookshelfGrid2Binding
 import io.legado.app.databinding.ItemBookshelfGridBinding
 import io.legado.app.databinding.ItemBookshelfGridGroup2Binding
 import io.legado.app.databinding.ItemBookshelfGridGroupBinding
-import io.legado.app.help.glide.ImageLoader
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.config.AppConfig
 import io.legado.app.utils.gone
 import io.legado.app.utils.invisible
 import io.legado.app.utils.visible
 import splitties.views.onLongClick
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.concurrent.TimeUnit
 
 @Suppress("UNUSED_PARAMETER")
 class BooksAdapterGrid(context: Context, callBack: CallBack) :
@@ -202,30 +210,47 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
             upCover(item)
         }
 
-        // F2 分组拼图：自定义封面 > 组内书封面拼图(最近读优先) > 默认封面占位
+        // F2 分组拼图：自定义封面 > 组内书封面拼图(最近读优先,异步拼合成单图) > 默认封面占位
         fun upCover(item: BookGroup) = binding.run {
+            ivCover.tag = item.groupId
             val preview = appDb.bookDao.getBooksForGroupPreview(item.groupId, 4)
             if (!item.cover.isNullOrBlank()) {
-                ivCover.visible()
-                llMosaic.gone()
                 ivCover.load(item.cover)
             } else if (preview.isEmpty()) {
-                ivCover.visible()
-                llMosaic.gone()
                 // load(null) 会让 Glide 清空图像，这里强制设置默认封面
                 ivCover.setImageResource(R.drawable.image_cover_default)
             } else {
-                ivCover.gone()
-                llMosaic.visible()
-                val views = listOf(ivMosaic1, ivMosaic2, ivMosaic3, ivMosaic4)
-                views.forEachIndexed { i, iv ->
-                    // 先强制占位图，再异步加载真封面（普通ImageView+ImageLoader 直连，稳定可靠）
-                    iv.setImageResource(R.drawable.image_cover_default)
-                    val book = preview.getOrNull(i)
-                    if (book != null) {
-                        ImageLoader.load(iv.context, book.getDisplayCover())
-                            .centerCrop()
-                            .into(iv)
+                // IO 线程把前4本封面拼成 2x2 单图，回主线程校验 tag 后显示（防复用串图）
+                val key = item.groupId
+                val iv = ivCover
+                val ctx = iv.context
+                GlobalScope.launch(Dispatchers.IO) {
+                    val h = 400
+                    val w = h * 3 / 4
+                    val bitmaps = preview.take(4).mapNotNull { b ->
+                        try {
+                            Glide.with(ctx).asBitmap().load(b.getDisplayCover())
+                                .centerCrop().submit(w / 2, h / 2).get(10, TimeUnit.SECONDS)
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+                    if (bitmaps.isEmpty()) return@launch
+                    val mosaic = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                    mosaic.eraseColor(0xFFE0E0E0.toInt())
+                    val canvas = Canvas(mosaic)
+                    val gap = 4f
+                    val cw = w / 2f
+                    val ch = h / 2f
+                    bitmaps.forEachIndexed { i, bmp ->
+                        val l = (i % 2) * cw
+                        val t = (i / 2) * ch
+                        canvas.drawBitmap(bmp, null, RectF(l + gap / 2, t + gap / 2, l + cw - gap / 2, t + ch - gap / 2), null)
+                    }
+                    withContext(Dispatchers.Main) {
+                        if (iv.tag == key) {
+                            iv.setImageBitmap(mosaic)
+                        }
                     }
                 }
             }
@@ -273,30 +298,47 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
             upCover(item)
         }
 
-        // F2 分组拼图：自定义封面 > 组内书封面拼图(最近读优先) > 默认封面占位
+        // F2 分组拼图：自定义封面 > 组内书封面拼图(最近读优先,异步拼合成单图) > 默认封面占位
         fun upCover(item: BookGroup) = binding.run {
+            ivCover.tag = item.groupId
             val preview = appDb.bookDao.getBooksForGroupPreview(item.groupId, 4)
             if (!item.cover.isNullOrBlank()) {
-                ivCover.visible()
-                llMosaic.gone()
                 ivCover.load(item.cover)
             } else if (preview.isEmpty()) {
-                ivCover.visible()
-                llMosaic.gone()
                 // load(null) 会让 Glide 清空图像，这里强制设置默认封面
                 ivCover.setImageResource(R.drawable.image_cover_default)
             } else {
-                ivCover.gone()
-                llMosaic.visible()
-                val views = listOf(ivMosaic1, ivMosaic2, ivMosaic3, ivMosaic4)
-                views.forEachIndexed { i, iv ->
-                    // 先强制占位图，再异步加载真封面（普通ImageView+ImageLoader 直连，稳定可靠）
-                    iv.setImageResource(R.drawable.image_cover_default)
-                    val book = preview.getOrNull(i)
-                    if (book != null) {
-                        ImageLoader.load(iv.context, book.getDisplayCover())
-                            .centerCrop()
-                            .into(iv)
+                // IO 线程把前4本封面拼成 2x2 单图，回主线程校验 tag 后显示（防复用串图）
+                val key = item.groupId
+                val iv = ivCover
+                val ctx = iv.context
+                GlobalScope.launch(Dispatchers.IO) {
+                    val h = 400
+                    val w = h * 3 / 4
+                    val bitmaps = preview.take(4).mapNotNull { b ->
+                        try {
+                            Glide.with(ctx).asBitmap().load(b.getDisplayCover())
+                                .centerCrop().submit(w / 2, h / 2).get(10, TimeUnit.SECONDS)
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+                    if (bitmaps.isEmpty()) return@launch
+                    val mosaic = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                    mosaic.eraseColor(0xFFE0E0E0.toInt())
+                    val canvas = Canvas(mosaic)
+                    val gap = 4f
+                    val cw = w / 2f
+                    val ch = h / 2f
+                    bitmaps.forEachIndexed { i, bmp ->
+                        val l = (i % 2) * cw
+                        val t = (i / 2) * ch
+                        canvas.drawBitmap(bmp, null, RectF(l + gap / 2, t + gap / 2, l + cw - gap / 2, t + ch - gap / 2), null)
+                    }
+                    withContext(Dispatchers.Main) {
+                        if (iv.tag == key) {
+                            iv.setImageBitmap(mosaic)
+                        }
                     }
                 }
             }
