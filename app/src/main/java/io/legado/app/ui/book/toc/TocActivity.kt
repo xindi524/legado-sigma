@@ -170,8 +170,11 @@ class TocActivity : VMBaseActivity<ActivityChapterListBinding, TocViewModel>(),
         return super.onCompatOptionsItemSelected(item)
     }
 
-    override fun onTocRegexDialogResult(book: Book?) {
-        book?.let { upBookAndToc(it) }
+    override fun onTocRegexDialogResult(tocRegex: String) {
+        viewModel.bookData.value?.let { book ->
+            book.tocUrl = tocRegex
+            upBookAndToc(book)
+        }
     }
 
     private fun upBookAndToc(book: Book) {
