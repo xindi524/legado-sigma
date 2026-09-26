@@ -3,6 +3,7 @@ package io.legado.app.ui.main.bookshelf.style2
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Bundle
@@ -242,6 +243,14 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     name = name.dropLast(1) + "…"
                 }
                 c.drawText(name, 150f, 215f, p)
+                // 细边框：与书架背景做小区分
+                val bt = ctx.primaryTextColor
+                val borderPaint = Paint().apply {
+                    color = Color.argb(80, Color.red(bt), Color.green(bt), Color.blue(bt))
+                    style = Paint.Style.STROKE
+                    strokeWidth = 3f
+                }
+                c.drawRoundRect(2f, 2f, 298f, 398f, 11f, 11f, borderPaint)
                 iv.setImageBitmap(bmp)
             } else {
                 // IO 线程拼合：直属书在前，直属子分组在后（子组封面=自定义>系统默认），共4格
@@ -293,6 +302,14 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                         val t = (i / 2) * ch
                         canvas.drawBitmap(bmp, null, RectF(l + gap / 2, t + gap / 2, l + cw - gap / 2, t + ch - gap / 2), null)
                     }
+                    // 细边框：与书架背景做小区分（圆角与控件裁剪同心，避免四角被裁）
+                    val bt = ctx.primaryTextColor
+                    val borderPaint = Paint().apply {
+                        color = Color.argb(80, Color.red(bt), Color.green(bt), Color.blue(bt))
+                        style = Paint.Style.STROKE
+                        strokeWidth = 3f
+                    }
+                    canvas.drawRoundRect(2f, 2f, w - 2f, h - 2f, 11f, 11f, borderPaint)
                     withContext(Dispatchers.Main) {
                         if (iv.tag == key) {
                             iv.setImageBitmap(mosaic)
@@ -372,6 +389,14 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     name = name.dropLast(1) + "…"
                 }
                 c.drawText(name, 150f, 215f, p)
+                // 细边框：与书架背景做小区分
+                val bt = ctx.primaryTextColor
+                val borderPaint = Paint().apply {
+                    color = Color.argb(80, Color.red(bt), Color.green(bt), Color.blue(bt))
+                    style = Paint.Style.STROKE
+                    strokeWidth = 3f
+                }
+                c.drawRoundRect(2f, 2f, 298f, 398f, 11f, 11f, borderPaint)
                 iv.setImageBitmap(bmp)
             } else {
                 // IO 线程拼合：直属书在前，直属子分组在后（子组封面=自定义>系统默认），共4格
@@ -423,6 +448,14 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                         val t = (i / 2) * ch
                         canvas.drawBitmap(bmp, null, RectF(l + gap / 2, t + gap / 2, l + cw - gap / 2, t + ch - gap / 2), null)
                     }
+                    // 细边框：与书架背景做小区分（圆角与控件裁剪同心，避免四角被裁）
+                    val bt = ctx.primaryTextColor
+                    val borderPaint = Paint().apply {
+                        color = Color.argb(80, Color.red(bt), Color.green(bt), Color.blue(bt))
+                        style = Paint.Style.STROKE
+                        strokeWidth = 3f
+                    }
+                    canvas.drawRoundRect(2f, 2f, w - 2f, h - 2f, 11f, 11f, borderPaint)
                     withContext(Dispatchers.Main) {
                         if (iv.tag == key) {
                             iv.setImageBitmap(mosaic)
