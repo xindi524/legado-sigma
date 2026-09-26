@@ -19,6 +19,7 @@ import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.constant.AppLog
 import io.legado.app.data.appDb
+import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.TxtTocRule
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.databinding.DialogTocRegexBinding
@@ -50,22 +51,18 @@ import kotlinx.coroutines.launch
 /**
  * txt目录规则
  */
-class TxtTocRuleDialog() : BaseDialogFragment(R.layout.dialog_toc_regex),
+class TxtTocRuleDialog(val book: Book?) : BaseDialogFragment(R.layout.dialog_toc_regex),
     Toolbar.OnMenuItemClickListener,
     TxtTocRuleEditDialog.Callback {
-
-    constructor(tocRegex: String?) : this() {
-        arguments = Bundle().apply {
-            putString("tocRegex", tocRegex)
-        }
-    }
 
     private val importTocRuleKey = "tocRuleUrl"
     private val viewModel: TxtTocRuleViewModel by viewModels()
     private val binding by viewBinding(DialogTocRegexBinding::bind)
     private val adapter by lazy { TocRegexAdapter(requireContext()) }
-    var selectedName: String? = null
-    private var durRegex: String? = null
+    // F3a：本书多选的规则名集合（点击切换选中/取消）
+    private val selectedNames = mutableSetOf<String>().also {
+        it.addAll(book?.getSelectedTocRuleNames() ?: emptyList())
+    }
     private val qrCodeResult = registerForActivityResult(QrCodeResult()) {
         it ?: return@registerForActivityResult
         showDialogFragment(ImportTxtTocRuleDialog(it))
@@ -83,7 +80,6 @@ class TxtTocRuleDialog() : BaseDialogFragment(R.layout.dialog_toc_regex),
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         binding.toolBar.setBackgroundColor(primaryColor)
-        durRegex = arguments?.getString("tocRegex")
         binding.toolBar.setTitle(R.string.txt_toc_rule)
         binding.toolBar.inflateMenu(R.menu.txt_toc_rule)
         binding.toolBar.menu.applyTint(requireContext())
@@ -102,14 +98,12 @@ class TxtTocRuleDialog() : BaseDialogFragment(R.layout.dialog_toc_regex),
             dismissAllowingStateLoss()
         }
         tvOk.setOnClickListener {
-            adapter.getItems().forEach { tocRule ->
-                if (selectedName == tocRule.name) {
-                    val callBack = activity as? CallBack
-                    callBack?.onTocRegexDialogResult(tocRule.rule + TextFile.spaceChars + tocRule.replacement)
-                    dismissAllowingStateLoss()
-                    return@setOnClickListener
-                }
-            }
+            // F3a：保存本书多选的规则并触发重新分章（空选=恢复全局规则竞争）
+            book?.setSelectedTocRuleNames(selectedNames.toList())
+            book?.let { appDb.bookDao.update(it) }
+            val callBack = activity as? CallBack
+            callBack?.onTocRegexDialogResult(book)
+            dismissAllowingStateLoss()
         }
     }
 
@@ -118,7 +112,6 @@ class TxtTocRuleDialog() : BaseDialogFragment(R.layout.dialog_toc_regex),
             appDb.txtTocRuleDao.observeAll().catch {
                 AppLog.put("TXT目录规则对话框获取数据失败\n${it.localizedMessage}", it)
             }.flowOn(IO).conflate().collect { tocRules ->
-                initSelectedName(tocRules)
                 adapter.setItems(tocRules, adapter.diffItemCallBack)
             }
         }
@@ -134,19 +127,6 @@ class TxtTocRuleDialog() : BaseDialogFragment(R.layout.dialog_toc_regex),
         super.onPause()
     }
 
-    private fun initSelectedName(tocRules: List<TxtTocRule>) {
-        if (selectedName == null && durRegex != null) {
-            tocRules.forEach {
-                if (durRegex == it.rule + TextFile.spaceChars + it.replacement) {
-                    selectedName = it.name
-                    return@forEach
-                }
-            }
-            if (selectedName == null) {
-                selectedName = ""
-            }
-        }
-    }
 
     override fun onMenuItemClick(item: MenuItem?): Boolean {
         when (item?.itemId) {
@@ -260,7 +240,7 @@ class TxtTocRuleDialog() : BaseDialogFragment(R.layout.dialog_toc_regex),
                     root.setBackgroundColor(context.backgroundColor)
                     rbRegexName.text = item.name
                     titleExample.text = item.example
-                    rbRegexName.isChecked = item.name == selectedName
+                    rbRegexName.isChecked = item.name in selectedNames
                     swtEnabled.isChecked = item.enable
                 } else {
                     for (i in payloads.indices) {
@@ -270,7 +250,7 @@ class TxtTocRuleDialog() : BaseDialogFragment(R.layout.dialog_toc_regex),
                                 "upName" -> rbRegexName.text = item.name
                                 "upExample" -> titleExample.text = item.example
                                 "enabled" -> swtEnabled.isChecked = item.enable
-                                "upSelect" -> rbRegexName.isChecked = item.name == selectedName
+                                "upSelect" -> rbRegexName.isChecked = item.name in selectedNames
                             }
                         }
                     }
@@ -281,9 +261,13 @@ class TxtTocRuleDialog() : BaseDialogFragment(R.layout.dialog_toc_regex),
         override fun registerListener(holder: ItemViewHolder, binding: ItemTocRegexBinding) {
             binding.apply {
                 rbRegexName.setOnUserCheckedChangeListener { isChecked ->
-                    if (isChecked) {
-                        selectedName = getItem(holder.layoutPosition)?.name
-                        updateItems(0, itemCount - 1, bundleOf("upSelect" to null))
+                    // F3a：多选切换——选中加入集合，取消则移出
+                    getItem(holder.layoutPosition)?.name?.let { name ->
+                        if (isChecked) {
+                            selectedNames.add(name)
+                        } else {
+                            selectedNames.remove(name)
+                        }
                     }
                 }
                 swtEnabled.setOnUserCheckedChangeListener { isChecked ->
@@ -330,7 +314,7 @@ class TxtTocRuleDialog() : BaseDialogFragment(R.layout.dialog_toc_regex),
     }
 
     interface CallBack {
-        fun onTocRegexDialogResult(tocRegex: String) {}
+        fun onTocRegexDialogResult(book: Book?) {}
     }
 
 }
