@@ -516,16 +516,22 @@ class TextFile(private var book: Book) {
     }
 
     /**
-     * F3a：本书多选规则并集分章
-     * 所有选中规则的匹配点合并排序（同位置先到先得），标题走各规则自己的替换净化；
-     * 无匹配的区间自然并入相邻章节；首个匹配前的内容作为书名章
+     * F3a：本书多选规则并集分章（对齐原版 analyze 语义）
+     * 章节边界使用"文件字节偏移"（正则匹配位置是字符位置，多字节编码下必须换算，否则内容错位）；
+     * 章节 start = 标题行末（正文从标题后开始），上一章 end 延伸到本章标题起点；
+     * 首个匹配前的非空内容作为"前言"章并提取简介；空组/无匹配整本一章
      */
     private fun parseTocByRules(rules: List<TxtTocRule>): Pair<ArrayList<BookChapter>, Int> {
-        val content = LocalBook.getBookInputStream(book).use { bis ->
-            String(bis.readBytes(), charset)
+        val bytes = LocalBook.getBookInputStream(book).use { it.readBytes() }
+        var bomLen = 0
+        if (bytes.size >= 3 && bytes[0] == 0xEF.toByte() && bytes[1] == 0xBB.toByte() && bytes[2] == 0xBF.toByte()) {
+            bomLen = 3
         }
-        val marks = linkedMapOf<Long, String>()
+        val content = String(bytes, bomLen, bytes.size - bomLen, charset)
+        val totalBytes = (bytes.size - bomLen).toLong()
         val spaceRegex = Regex("\\s+")
+        // 收集所有匹配点：字符位置 -> (净化标题, 原始匹配文本字节数)，同位置先到先得
+        val marks = linkedMapOf<Int, Pair<String, Int>>()
         for (rule in rules) {
             val pattern = try {
                 rule.rule.toPattern(Pattern.MULTILINE)
@@ -536,33 +542,55 @@ class TextFile(private var book: Book) {
             val matcher = pattern.matcher(content)
             var csNum = 0
             while (matcher.find()) {
-                val title = replacement(matcher.group(), rule.replacement, csNum, null, matcher.group().length)
+                val group = matcher.group()
+                val title = replacement(group, rule.replacement, csNum, null, group.length)
                     .trim().replace(spaceRegex, " ")
                 csNum++
-                if (title.isNotEmpty() && !marks.containsKey(matcher.start().toLong())) {
-                    marks[matcher.start().toLong()] = title
+                if (title.isNotEmpty() && !marks.containsKey(matcher.start())) {
+                    marks[matcher.start()] = Pair(title, group.toByteArray(charset).size)
                 }
             }
         }
-        val toc = ArrayList<BookChapter>()
-        val starts = marks.keys.sorted()
-        if (starts.isEmpty()) {
-            val chapter = BookChapter(title = book.name, start = 0, end = content.length.toLong())
+        val toc = arrayListOf<BookChapter>()
+        if (marks.isEmpty()) {
+            val chapter = BookChapter(title = book.name, start = 0, end = totalBytes)
             chapter.wordCount = StringUtils.wordCountFormat(content.length)
             toc.add(chapter)
             return toc to content.length
         }
-        if (starts.first() > 0) {
-            val head = BookChapter(title = book.name, start = 0, end = starts.first())
-            head.wordCount = StringUtils.wordCountFormat(starts.first().toInt())
-            toc.add(head)
+        // 字符位置 -> 字节偏移（BOM 已扣除，线性累加换算）
+        var charCursor = 0
+        var byteCursor = 0L
+        val byteMarks = ArrayList<Triple<Long, String, Int>>(marks.size)
+        for ((charStart, pair) in marks) {
+            if (charStart > charCursor) {
+                byteCursor += content.substring(charCursor, charStart).toByteArray(charset).size
+                charCursor = charStart
+            }
+            byteMarks.add(Triple(byteCursor, pair.first, pair.second))
         }
-        starts.forEachIndexed { i, start ->
-            val end = if (i + 1 < starts.size) starts[i + 1] else content.length.toLong()
-            val chapter = BookChapter(title = marks[start] ?: "", start = start, end = end)
-            chapter.wordCount = StringUtils.wordCountFormat((end - start).toInt())
+        // 首个匹配前的内容作为"前言"章（并提取简介，对齐原版行为）
+        val firstCharStart = marks.firstKey()
+        val headContent = content.substring(0, firstCharStart)
+        if (headContent.isNotBlank()) {
+            val headChapter = BookChapter(title = "前言", start = 0, end = byteMarks.first().first)
+            headChapter.wordCount = StringUtils.wordCountFormat(headContent.length)
+            toc.add(headChapter)
+            book.intro = if (headContent.length > 600) headContent.take(600) else headContent
+        }
+        // 逐匹配生成章节：上一章 end 延伸到本章标题起点，本章 start = 标题行末
+        for ((idx, t) in byteMarks.withIndex()) {
+            val (titleByteStart, title, titleBytes) = t
+            toc.lastOrNull()?.let { last ->
+                last.end = titleByteStart
+            }
+            val chapter = BookChapter()
+            chapter.title = title
+            chapter.start = titleByteStart + titleBytes
+            chapter.end = chapter.start
             toc.add(chapter)
         }
+        toc.lastOrNull()?.let { it.end = totalBytes }
         return toc to content.length
     }
 
