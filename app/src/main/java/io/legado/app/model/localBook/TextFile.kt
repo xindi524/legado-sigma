@@ -542,12 +542,20 @@ class TextFile(private var book: Book) {
             val matcher = pattern.matcher(content)
             var csNum = 0
             while (matcher.find()) {
+                // 行首校验：章节标题必然位于行首（前一行以换行结束），过滤正文中"第X章"字样的行中误匹配
+                val st = matcher.start()
+                if (st > 0) {
+                    val prev = content[st - 1]
+                    if (prev != '\n' && prev != '\r') {
+                        continue
+                    }
+                }
                 val group = matcher.group()
                 val title = replacement(group, rule.replacement, csNum, null, group.length)
                     .trim().replace(spaceRegex, " ")
                 csNum++
-                if (title.isNotEmpty() && !marks.containsKey(matcher.start())) {
-                    marks[matcher.start()] = Pair(title, group.toByteArray(charset).size)
+                if (title.isNotEmpty() && !marks.containsKey(st)) {
+                    marks[st] = Pair(title, group.toByteArray(charset).size)
                 }
             }
         }
