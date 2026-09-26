@@ -255,7 +255,8 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     // 书与子分组按最后阅读时间混排（子分组时间=组内书的最新阅读时间，真进书阅读才更新），取前4
                     val entries = mutableListOf<Pair<Any, Long>>()
                     preview.forEach { b ->
-                        entries.add(Pair(b.getDisplayCover(), b.durChapterTime))
+                        val bm: Any = b.getDisplayCover() ?: R.drawable.image_cover_default
+                        entries.add(Pair(bm, b.durChapterTime))
                     }
                     // 子分组时间递归：= max(直属书最新阅读, 各子子分组时间)
                     fun deepTime(gid: Long, d: Int): Long {
@@ -383,7 +384,8 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     // 书与子分组按最后阅读时间混排（子分组时间=组内书的最新阅读时间，真进书阅读才更新），取前4
                     val entries = mutableListOf<Pair<Any, Long>>()
                     preview.forEach { b ->
-                        entries.add(Pair(b.getDisplayCover(), b.durChapterTime))
+                        val bm: Any = b.getDisplayCover() ?: R.drawable.image_cover_default
+                        entries.add(Pair(bm, b.durChapterTime))
                     }
                     // 子分组时间递归：= max(直属书最新阅读, 各子子分组时间)
                     fun deepTime(gid: Long, d: Int): Long {
