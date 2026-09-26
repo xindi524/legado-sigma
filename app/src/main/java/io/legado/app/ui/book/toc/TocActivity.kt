@@ -174,7 +174,7 @@ class TocActivity : VMBaseActivity<ActivityChapterListBinding, TocViewModel>(),
         book?.let { upBookAndToc(it) }
     }
 
-    override fun upBookAndToc(book: Book) {
+    private fun upBookAndToc(book: Book) {
         waitDialog.show()
         viewModel.upBookTocRule(book) {
             waitDialog.dismiss()
