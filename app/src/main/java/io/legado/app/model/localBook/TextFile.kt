@@ -533,8 +533,8 @@ class TextFile(private var book: Book) {
             val matcher = pattern.matcher(content)
             while (matcher.find()) {
                 val title = matcher.group().trim().replace(spaceRegex, " ")
-                if (title.isNotEmpty() && !marks.containsKey(matcher.start())) {
-                    marks[matcher.start()] = title
+                if (title.isNotEmpty() && !marks.containsKey(matcher.start().toLong())) {
+                    marks[matcher.start().toLong()] = title
                 }
             }
         }
@@ -544,7 +544,7 @@ class TextFile(private var book: Book) {
             val chapter = BookChapter(title = book.name, start = 0, end = content.length.toLong())
             chapter.wordCount = StringUtils.wordCountFormat(content.length)
             toc.add(chapter)
-            return toc to content.length.toLong()
+            return toc to content.length
         }
         if (starts.first() > 0) {
             val head = BookChapter(title = book.name, start = 0, end = starts.first())
@@ -557,7 +557,7 @@ class TextFile(private var book: Book) {
             chapter.wordCount = StringUtils.wordCountFormat((end - start).toInt())
             toc.add(chapter)
         }
-        return toc to content.length.toLong()
+        return toc to content.length
     }
 
     /**
