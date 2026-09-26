@@ -355,12 +355,24 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
     // F1 嵌套分组：当前视图应显示的分组块
     // 主页=全部：首页显示用户自建顶层分组块＋"全部/本地/音频"等受开关控制的功能块（show 开关），
     // "网络未分组/本地未分组"两个拆分视图不上首页；未分组的书（本地+网络）直接散落首页
+    // F2：分组块按"组的最后阅读时间"排序（组内书最新阅读，递归含子分组；逛分组不产生阅读时间）
     private fun getCurrentGroups(): List<BookGroup> {
         val hideIds = listOf(BookGroup.IdNetNone, BookGroup.IdLocalNone)
-        return when (groupId) {
+        val groups = when (groupId) {
             BookGroup.IdRoot -> bookGroups.filter { it.parentId == 0L && it.groupId !in hideIds }
             else -> bookGroups.filter { it.parentId == groupId }
         }
+        return groups.sortedByDescending { groupLastReadTime(it.groupId) }
+    }
+
+    // F2：组的最后阅读时间 = max(直属书最新阅读, 各子分组递归)
+    private fun groupLastReadTime(gid: Long, depth: Int = 0): Long {
+        if (depth > 10) return 0L
+        var t = appDb.bookDao.getGroupLastReadTime(gid)
+        appDb.bookGroupDao.getByParent(gid).forEach { cg ->
+            t = maxOf(t, groupLastReadTime(cg.groupId, depth + 1))
+        }
+        return t
     }
 
     fun getItemCount(): Int {
