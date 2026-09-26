@@ -6,7 +6,7 @@
     android:layout_height="wrap_content"
     android:padding="16dp">
 
-    <io.legado.app.lib.theme.view.ThemeRadioButton
+    <io.legado.app.lib.theme.view.ThemeCheckBox
         android:id="@+id/rb_regex_name"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
