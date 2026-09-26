@@ -267,9 +267,8 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                         return t
                     }
                     childGroups.forEach { cg ->
-                        entries.add(
-                            Pair(cg.cover ?: R.drawable.image_cover_default, deepTime(cg.groupId, 0))
-                        )
+                        val model: Any = cg.cover ?: R.drawable.image_cover_default
+                        entries.add(Pair(model, deepTime(cg.groupId, 0)))
                     }
                     val models = entries.sortedByDescending { it.second }.take(4).map { it.first }
                     val bitmaps = models.mapNotNull { m ->
@@ -396,9 +395,8 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                         return t
                     }
                     childGroups.forEach { cg ->
-                        entries.add(
-                            Pair(cg.cover ?: R.drawable.image_cover_default, deepTime(cg.groupId, 0))
-                        )
+                        val model: Any = cg.cover ?: R.drawable.image_cover_default
+                        entries.add(Pair(model, deepTime(cg.groupId, 0)))
                     }
                     val models = entries.sortedByDescending { it.second }.take(4).map { it.first }
                     val bitmaps = models.mapNotNull { m ->
