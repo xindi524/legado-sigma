@@ -293,13 +293,15 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     val mosaic = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
                     mosaic.eraseColor(bgColor)
                     val canvas = Canvas(mosaic)
-                    // 均匀缝隙（含外框），间隙适中
+                    // 缝隙统一：格间缝 = 格子与边框之间的空隙
                     val gap = 8f
-                    val cw = w / 2f
-                    val ch = h / 2f
+                    val borderInset = 2f
+                    val pad = borderInset + 3f + gap
+                    val cw = (w - pad * 2) / 2f
+                    val ch = (h - pad * 2) / 2f
                     bitmaps.forEachIndexed { i, bmp ->
-                        val l = (i % 2) * cw
-                        val t = (i / 2) * ch
+                        val l = pad + (i % 2) * cw
+                        val t = pad + (i / 2) * ch
                         canvas.drawBitmap(bmp, null, RectF(l + gap / 2, t + gap / 2, l + cw - gap / 2, t + ch - gap / 2), null)
                     }
                     // 细边框：与书架背景做小区分（圆角与控件裁剪同心，避免四角被裁）
@@ -439,13 +441,15 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     val mosaic = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
                     mosaic.eraseColor(bgColor)
                     val canvas = Canvas(mosaic)
-                    // 均匀缝隙（含外框），间隙适中
+                    // 缝隙统一：格间缝 = 格子与边框之间的空隙
                     val gap = 8f
-                    val cw = w / 2f
-                    val ch = h / 2f
+                    val borderInset = 2f
+                    val pad = borderInset + 3f + gap
+                    val cw = (w - pad * 2) / 2f
+                    val ch = (h - pad * 2) / 2f
                     bitmaps.forEachIndexed { i, bmp ->
-                        val l = (i % 2) * cw
-                        val t = (i / 2) * ch
+                        val l = pad + (i % 2) * cw
+                        val t = pad + (i / 2) * ch
                         canvas.drawBitmap(bmp, null, RectF(l + gap / 2, t + gap / 2, l + cw - gap / 2, t + ch - gap / 2), null)
                     }
                     // 细边框：与书架背景做小区分（圆角与控件裁剪同心，避免四角被裁）
