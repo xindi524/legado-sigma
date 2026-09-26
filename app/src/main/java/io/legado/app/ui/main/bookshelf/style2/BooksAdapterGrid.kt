@@ -284,16 +284,14 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     val mosaic = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
                     mosaic.eraseColor(bgColor)
                     val canvas = Canvas(mosaic)
-                    // 仿 MD3：垂直方向满铺无缝，水平仅中缝极细——格子最大化
-                    val gapH = 6f
+                    // 均匀缝隙（含外框），间隙适中
+                    val gap = 10f
                     val cw = w / 2f
                     val ch = h / 2f
                     bitmaps.forEachIndexed { i, bmp ->
                         val l = (i % 2) * cw
                         val t = (i / 2) * ch
-                        val left = if (i % 2 == 0) l else l + gapH / 2
-                        val right = if (i % 2 == 0) l + cw - gapH / 2 else l + cw
-                        canvas.drawBitmap(bmp, null, RectF(left, t, right, t + ch), null)
+                        canvas.drawBitmap(bmp, null, RectF(l + gap / 2, t + gap / 2, l + cw - gap / 2, t + ch - gap / 2), null)
                     }
                     withContext(Dispatchers.Main) {
                         if (iv.tag == key) {
@@ -416,16 +414,14 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     val mosaic = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
                     mosaic.eraseColor(bgColor)
                     val canvas = Canvas(mosaic)
-                    // 仿 MD3：垂直方向满铺无缝，水平仅中缝极细——格子最大化
-                    val gapH = 6f
+                    // 均匀缝隙（含外框），间隙适中
+                    val gap = 10f
                     val cw = w / 2f
                     val ch = h / 2f
                     bitmaps.forEachIndexed { i, bmp ->
                         val l = (i % 2) * cw
                         val t = (i / 2) * ch
-                        val left = if (i % 2 == 0) l else l + gapH / 2
-                        val right = if (i % 2 == 0) l + cw - gapH / 2 else l + cw
-                        canvas.drawBitmap(bmp, null, RectF(left, t, right, t + ch), null)
+                        canvas.drawBitmap(bmp, null, RectF(l + gap / 2, t + gap / 2, l + cw - gap / 2, t + ch - gap / 2), null)
                     }
                     withContext(Dispatchers.Main) {
                         if (iv.tag == key) {
