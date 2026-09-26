@@ -260,14 +260,16 @@ class TxtTocRuleDialog(val book: Book?) : BaseDialogFragment(R.layout.dialog_toc
 
         override fun registerListener(holder: ItemViewHolder, binding: ItemTocRegexBinding) {
             binding.apply {
-                rbRegexName.setOnUserCheckedChangeListener { isChecked ->
-                    // F3a：多选切换——选中加入集合，取消则移出
+                // F3a：点击切换选中/取消（RadioButton 点击已选中项不触发状态变化，故用点击事件强制切换）
+                rbRegexName.setOnClickListener {
                     getItem(holder.layoutPosition)?.name?.let { name ->
-                        if (isChecked) {
+                        val target = name !in selectedNames
+                        if (target) {
                             selectedNames.add(name)
                         } else {
                             selectedNames.remove(name)
                         }
+                        rbRegexName.isChecked = target
                     }
                 }
                 swtEnabled.setOnUserCheckedChangeListener { isChecked ->
