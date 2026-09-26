@@ -218,7 +218,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
         // 全空组显示组名文字封面
         fun upCover(item: BookGroup) = binding.run {
             ivCover.tag = item.groupId
-            val preview = appDb.bookDao.getBooksForGroupPreview(item.groupId, 4)
+            val preview = appDb.bookDao.getBooksForGroupPreview(item.groupId, 8)
             val childGroups = appDb.bookGroupDao.getByParent(item.groupId)
             if (!item.cover.isNullOrBlank()) {
                 ivCover.load(item.cover)
@@ -252,26 +252,23 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     val h = 400
                     val w = h * 3 / 4
                     val bgColor = ctx.primaryColor
-                    val bitmaps = mutableListOf<Bitmap>()
-                    preview.take(4).forEach { b ->
-                        try {
-                            bitmaps.add(
-                                Glide.with(ctx).asBitmap().load(b.getDisplayCover())
-                                    .centerCrop().submit(w / 2, h / 2).get(10, TimeUnit.SECONDS)
-                            )
-                        } catch (e: Exception) {
-                        }
+                    // 书与子分组按最后阅读时间混排（子分组时间=组内书的最新阅读时间，真进书阅读才更新），取前4
+                    val entries = mutableListOf<Pair<Any, Long>>()
+                    preview.forEach { b ->
+                        entries.add(Pair(b.getDisplayCover(), b.durChapterTime))
                     }
                     childGroups.forEach { cg ->
-                        if (bitmaps.size < 4) {
-                            try {
-                                val model: Any = cg.cover ?: R.drawable.image_cover_default
-                                bitmaps.add(
-                                    Glide.with(ctx).asBitmap().load(model)
-                                        .centerCrop().submit(w / 2, h / 2).get(10, TimeUnit.SECONDS)
-                                )
-                            } catch (e: Exception) {
-                            }
+                        entries.add(
+                            Pair(cg.cover ?: R.drawable.image_cover_default, appDb.bookDao.getGroupLastReadTime(cg.groupId))
+                        )
+                    }
+                    val models = entries.sortedByDescending { it.second }.take(4).map { it.first }
+                    val bitmaps = models.mapNotNull { m ->
+                        try {
+                            Glide.with(ctx).asBitmap().load(m)
+                                .centerCrop().submit(w / 2, h / 2).get(10, TimeUnit.SECONDS)
+                        } catch (e: Exception) {
+                            null
                         }
                     }
                     if (bitmaps.isEmpty()) return@launch
@@ -341,7 +338,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
         // 全空组显示组名文字封面
         fun upCover(item: BookGroup) = binding.run {
             ivCover.tag = item.groupId
-            val preview = appDb.bookDao.getBooksForGroupPreview(item.groupId, 4)
+            val preview = appDb.bookDao.getBooksForGroupPreview(item.groupId, 8)
             val childGroups = appDb.bookGroupDao.getByParent(item.groupId)
             if (!item.cover.isNullOrBlank()) {
                 ivCover.load(item.cover)
@@ -375,26 +372,23 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     val h = 400
                     val w = h * 3 / 4
                     val bgColor = ctx.primaryColor
-                    val bitmaps = mutableListOf<Bitmap>()
-                    preview.take(4).forEach { b ->
-                        try {
-                            bitmaps.add(
-                                Glide.with(ctx).asBitmap().load(b.getDisplayCover())
-                                    .centerCrop().submit(w / 2, h / 2).get(10, TimeUnit.SECONDS)
-                            )
-                        } catch (e: Exception) {
-                        }
+                    // 书与子分组按最后阅读时间混排（子分组时间=组内书的最新阅读时间，真进书阅读才更新），取前4
+                    val entries = mutableListOf<Pair<Any, Long>>()
+                    preview.forEach { b ->
+                        entries.add(Pair(b.getDisplayCover(), b.durChapterTime))
                     }
                     childGroups.forEach { cg ->
-                        if (bitmaps.size < 4) {
-                            try {
-                                val model: Any = cg.cover ?: R.drawable.image_cover_default
-                                bitmaps.add(
-                                    Glide.with(ctx).asBitmap().load(model)
-                                        .centerCrop().submit(w / 2, h / 2).get(10, TimeUnit.SECONDS)
-                                )
-                            } catch (e: Exception) {
-                            }
+                        entries.add(
+                            Pair(cg.cover ?: R.drawable.image_cover_default, appDb.bookDao.getGroupLastReadTime(cg.groupId))
+                        )
+                    }
+                    val models = entries.sortedByDescending { it.second }.take(4).map { it.first }
+                    val bitmaps = models.mapNotNull { m ->
+                        try {
+                            Glide.with(ctx).asBitmap().load(m)
+                                .centerCrop().submit(w / 2, h / 2).get(10, TimeUnit.SECONDS)
+                        } catch (e: Exception) {
+                            null
                         }
                     }
                     if (bitmaps.isEmpty()) return@launch
