@@ -87,6 +87,27 @@ class TextFile(private var book: Book) {
      */
     @Throws(FileNotFoundException::class, SecurityException::class, EmptyFileException::class)
     fun getChapterList(): ArrayList<BookChapter> {
+        // F3a：本书自定义多正则（variableMap["tocRegexes"]）非空时，走多正则并集分章
+        val customRegexes = book.getTocRegexes()
+        if (customRegexes.isNotEmpty()) {
+            if (book.charset.isNullOrBlank()) {
+                LocalBook.getBookInputStream(book).use { bis ->
+                    val buffer = ByteArray(bufferSize)
+                    val length = bis.read(buffer)
+                    book.charset = EncodingDetect.getEncode(buffer.copyOf(length))
+                }
+            }
+            charset = book.fileCharset()
+            val (toc, wordCount) = parseTocByRegexes(customRegexes)
+            book.wordCount = StringUtils.wordCountFormat(wordCount)
+            toc.forEachIndexed { index, bookChapter ->
+                bookChapter.index = index
+                bookChapter.bookUrl = book.bookUrl
+                bookChapter.url = MD5Utils.md5Encode16(book.originName + index + bookChapter.title)
+            }
+            getWordCount(toc, book)
+            return toc
+        }
         val modified = book.isLocalModified()
         if (book.charset == null || book.tocUrl.isBlank() || modified) {
             LocalBook.getBookInputStream(book).use { bis ->
@@ -489,6 +510,54 @@ class TextFile(private var book: Book) {
             }
         }
         return toc to bookWordCount
+    }
+
+    /**
+     * F3a：本书多正则并集分章
+     * 所有正则的匹配点合并排序（正则顺序即优先级，同位置先到先得），标题取匹配文本；
+     * 无匹配的区间自然并入相邻章节；首个匹配前的内容作为书名章
+     */
+    private fun parseTocByRegexes(regexes: List<String>): Pair<ArrayList<BookChapter>, Long> {
+        val content = LocalBook.getBookInputStream(book).use { bis ->
+            String(bis.readBytes(), charset)
+        }
+        val marks = linkedMapOf<Long, String>()
+        val spaceRegex = Regex("\\s+")
+        for (regex in regexes) {
+            val pattern = try {
+                regex.toPattern(Pattern.MULTILINE)
+            } catch (e: PatternSyntaxException) {
+                AppLog.put("本书目录正则语法错误:$regex\n$e", e)
+                continue
+            }
+            val matcher = pattern.matcher(content)
+            while (matcher.find()) {
+                val title = matcher.group().trim().replace(spaceRegex, " ")
+                if (title.isNotEmpty() && !marks.containsKey(matcher.start())) {
+                    marks[matcher.start()] = title
+                }
+            }
+        }
+        val toc = ArrayList<BookChapter>()
+        val starts = marks.keys.sorted()
+        if (starts.isEmpty()) {
+            val chapter = BookChapter(title = book.name, start = 0, end = content.length.toLong())
+            chapter.wordCount = StringUtils.wordCountFormat(content.length)
+            toc.add(chapter)
+            return toc to content.length.toLong()
+        }
+        if (starts.first() > 0) {
+            val head = BookChapter(title = book.name, start = 0, end = starts.first())
+            head.wordCount = StringUtils.wordCountFormat(starts.first().toInt())
+            toc.add(head)
+        }
+        starts.forEachIndexed { i, start ->
+            val end = if (i + 1 < starts.size) starts[i + 1] else content.length.toLong()
+            val chapter = BookChapter(title = marks[start] ?: "", start = start, end = end)
+            chapter.wordCount = StringUtils.wordCountFormat((end - start).toInt())
+            toc.add(chapter)
+        }
+        return toc to content.length.toLong()
     }
 
     /**
