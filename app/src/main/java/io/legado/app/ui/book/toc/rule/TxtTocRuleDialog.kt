@@ -98,11 +98,15 @@ class TxtTocRuleDialog(val book: Book?) : BaseDialogFragment(R.layout.dialog_toc
             dismissAllowingStateLoss()
         }
         tvOk.setOnClickListener {
-            // F3a：保存本书多选的规则并触发重新分章（空选=恢复全局规则竞争）
+            // F3a：多选规则合并为一条交替正则，完全复用原版分章流程（字节精度与原版一致）
+            // 空选=恢复全局单规则竞争
             book?.setSelectedTocRuleNames(selectedNames.toList())
             book?.let { appDb.bookDao.update(it) }
+            val mosaicRegex = adapter.getItems()
+                .filter { it.name in selectedNames }
+                .joinToString("|") { "(?:${it.rule})" }
             val callBack = activity as? CallBack
-            callBack?.onTocRegexDialogResult(book)
+            callBack?.onTocRegexDialogResult(mosaicRegex)
             dismissAllowingStateLoss()
         }
     }
@@ -316,7 +320,7 @@ class TxtTocRuleDialog(val book: Book?) : BaseDialogFragment(R.layout.dialog_toc
     }
 
     interface CallBack {
-        fun onTocRegexDialogResult(book: Book?) {}
+        fun onTocRegexDialogResult(tocRegex: String) {}
     }
 
 }
