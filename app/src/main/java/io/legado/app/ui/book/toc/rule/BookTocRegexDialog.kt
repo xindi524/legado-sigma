@@ -15,6 +15,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.utils.dpToPx
+import io.legado.app.utils.setLayout
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.legado.app.databinding.DialogBookTocRegexBinding
@@ -69,14 +70,13 @@ class BookTocRegexDialog(val book: Book) : BaseDialogFragment(R.layout.dialog_bo
             setText(text)
             hint = "正则表达式，如：第[0-9一二三四五六七八九十百千]+[章节回]"
             textSize = 14f
-            singleLine = false
             setMaxLines(3)
         }
         val del = TextView(ctx).apply {
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply { marginStart = 12.dpToPx() }
-            text = "✕"
+            setText("✕")
             textSize = 18f
             setPadding(8.dpToPx(), 8.dpToPx(), 8.dpToPx(), 8.dpToPx())
             setOnClickListener {
