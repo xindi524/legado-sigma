@@ -144,9 +144,9 @@ data class Book(
         GSON.fromJsonObject<HashMap<String, String>>(variable).getOrNull() ?: hashMapOf()
     }
 
-    // F3a：本书自定义多正则（存 variableMap，免数据库迁移）
-    fun getTocRegexes(): List<String> {
-        val json = variableMap["tocRegexes"] ?: return emptyList()
+    // F3a：本书多选的目录规则名（存 variableMap，免数据库迁移；空列表=跟随全局规则）
+    fun getSelectedTocRuleNames(): List<String> {
+        val json = variableMap["tocRuleNames"] ?: return emptyList()
         return try {
             val arr = org.json.JSONArray(json)
             (0 until arr.length()).map { arr.getString(it) }.filter { it.isNotBlank() }
@@ -155,10 +155,14 @@ data class Book(
         }
     }
 
-    fun setTocRegexes(list: List<String>) {
-        val arr = org.json.JSONArray()
-        list.filter { it.isNotBlank() }.forEach { arr.put(it) }
-        variableMap["tocRegexes"] = arr.toString()
+    fun setSelectedTocRuleNames(list: List<String>) {
+        if (list.isEmpty()) {
+            variableMap.remove("tocRuleNames")
+        } else {
+            val arr = org.json.JSONArray()
+            list.forEach { arr.put(it) }
+            variableMap["tocRuleNames"] = arr.toString()
+        }
         variable = GSON.toJson(variableMap)
     }
 
