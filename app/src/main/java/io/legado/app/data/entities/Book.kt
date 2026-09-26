@@ -144,6 +144,24 @@ data class Book(
         GSON.fromJsonObject<HashMap<String, String>>(variable).getOrNull() ?: hashMapOf()
     }
 
+    // F3a：本书自定义多正则（存 variableMap，免数据库迁移）
+    fun getTocRegexes(): List<String> {
+        val json = variableMap["tocRegexes"] ?: return emptyList()
+        return try {
+            val arr = org.json.JSONArray(json)
+            (0 until arr.length()).map { arr.getString(it) }.filter { it.isNotBlank() }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    fun setTocRegexes(list: List<String>) {
+        val arr = org.json.JSONArray()
+        list.filter { it.isNotBlank() }.forEach { arr.put(it) }
+        variableMap["tocRegexes"] = arr.toString()
+        variable = GSON.toJson(variableMap)
+    }
+
     @Ignore
     @IgnoredOnParcel
     override var infoHtml: String? = null
