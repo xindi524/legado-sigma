@@ -257,9 +257,18 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     preview.forEach { b ->
                         entries.add(Pair(b.getDisplayCover(), b.durChapterTime))
                     }
+                    // 子分组时间递归：= max(直属书最新阅读, 各子子分组时间)
+                    fun deepTime(gid: Long, d: Int): Long {
+                        if (d > 10) return 0L
+                        var t = appDb.bookDao.getGroupLastReadTime(gid)
+                        appDb.bookGroupDao.getByParent(gid).forEach { cg2 ->
+                            t = maxOf(t, deepTime(cg2.groupId, d + 1))
+                        }
+                        return t
+                    }
                     childGroups.forEach { cg ->
                         entries.add(
-                            Pair(cg.cover ?: R.drawable.image_cover_default, appDb.bookDao.getGroupLastReadTime(cg.groupId))
+                            Pair(cg.cover ?: R.drawable.image_cover_default, deepTime(cg.groupId, 0))
                         )
                     }
                     val models = entries.sortedByDescending { it.second }.take(4).map { it.first }
@@ -377,9 +386,18 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     preview.forEach { b ->
                         entries.add(Pair(b.getDisplayCover(), b.durChapterTime))
                     }
+                    // 子分组时间递归：= max(直属书最新阅读, 各子子分组时间)
+                    fun deepTime(gid: Long, d: Int): Long {
+                        if (d > 10) return 0L
+                        var t = appDb.bookDao.getGroupLastReadTime(gid)
+                        appDb.bookGroupDao.getByParent(gid).forEach { cg2 ->
+                            t = maxOf(t, deepTime(cg2.groupId, d + 1))
+                        }
+                        return t
+                    }
                     childGroups.forEach { cg ->
                         entries.add(
-                            Pair(cg.cover ?: R.drawable.image_cover_default, appDb.bookDao.getGroupLastReadTime(cg.groupId))
+                            Pair(cg.cover ?: R.drawable.image_cover_default, deepTime(cg.groupId, 0))
                         )
                     }
                     val models = entries.sortedByDescending { it.second }.take(4).map { it.first }
