@@ -87,9 +87,12 @@ class TextFile(private var book: Book) {
      */
     @Throws(FileNotFoundException::class, SecurityException::class, EmptyFileException::class)
     fun getChapterList(): ArrayList<BookChapter> {
-        // F3a：本书自定义多正则（variableMap["tocRegexes"]）非空时，走多正则并集分章
-        val customRegexes = book.getTocRegexes()
-        if (customRegexes.isNotEmpty()) {
+        // F3a：本书多选目录规则（variableMap["tocRuleNames"]）非空时，多规则并集分章
+        val selectedNames = book.getSelectedTocRuleNames()
+        val selectedRules = if (selectedNames.isNotEmpty()) {
+            getTocRules().filter { it.name in selectedNames }
+        } else emptyList()
+        if (selectedRules.isNotEmpty()) {
             if (book.charset.isNullOrBlank()) {
                 LocalBook.getBookInputStream(book).use { bis ->
                     val buffer = ByteArray(bufferSize)
@@ -98,7 +101,7 @@ class TextFile(private var book: Book) {
                 }
             }
             charset = book.fileCharset()
-            val (toc, wordCount) = parseTocByRegexes(customRegexes)
+            val (toc, wordCount) = parseTocByRules(selectedRules)
             book.wordCount = StringUtils.wordCountFormat(wordCount)
             toc.forEachIndexed { index, bookChapter ->
                 bookChapter.index = index
@@ -513,26 +516,29 @@ class TextFile(private var book: Book) {
     }
 
     /**
-     * F3a：本书多正则并集分章
-     * 所有正则的匹配点合并排序（正则顺序即优先级，同位置先到先得），标题取匹配文本；
+     * F3a：本书多选规则并集分章
+     * 所有选中规则的匹配点合并排序（同位置先到先得），标题走各规则自己的替换净化；
      * 无匹配的区间自然并入相邻章节；首个匹配前的内容作为书名章
      */
-    private fun parseTocByRegexes(regexes: List<String>): Pair<ArrayList<BookChapter>, Int> {
+    private fun parseTocByRules(rules: List<TxtTocRule>): Pair<ArrayList<BookChapter>, Int> {
         val content = LocalBook.getBookInputStream(book).use { bis ->
             String(bis.readBytes(), charset)
         }
         val marks = linkedMapOf<Long, String>()
         val spaceRegex = Regex("\\s+")
-        for (regex in regexes) {
+        for (rule in rules) {
             val pattern = try {
-                regex.toPattern(Pattern.MULTILINE)
+                rule.rule.toPattern(Pattern.MULTILINE)
             } catch (e: PatternSyntaxException) {
-                AppLog.put("本书目录正则语法错误:$regex\n$e", e)
+                AppLog.put("本书目录规则语法错误:${rule.name}\n$e", e)
                 continue
             }
             val matcher = pattern.matcher(content)
+            var csNum = 0
             while (matcher.find()) {
-                val title = matcher.group().trim().replace(spaceRegex, " ")
+                val title = replacement(matcher.group(), rule.replacement, csNum, null, matcher.group().length)
+                    .trim().replace(spaceRegex, " ")
+                csNum++
                 if (title.isNotEmpty() && !marks.containsKey(matcher.start().toLong())) {
                     marks[matcher.start().toLong()] = title
                 }
