@@ -558,11 +558,12 @@ class TextFile(private var book: Book) {
             toc.add(chapter)
             return toc to content.length
         }
-        // 字符位置 -> 字节偏移（BOM 已扣除，线性累加换算）
+        // 字符位置 -> 字节偏移（BOM 已扣除，按位置升序线性累加换算）
+        val sortedMarks = marks.toSortedMap()
         var charCursor = 0
         var byteCursor = 0L
-        val byteMarks = ArrayList<Triple<Long, String, Int>>(marks.size)
-        for ((charStart, pair) in marks) {
+        val byteMarks = ArrayList<Triple<Long, String, Int>>(sortedMarks.size)
+        for ((charStart, pair) in sortedMarks) {
             if (charStart > charCursor) {
                 byteCursor += content.substring(charCursor, charStart).toByteArray(charset).size
                 charCursor = charStart
@@ -570,7 +571,7 @@ class TextFile(private var book: Book) {
             byteMarks.add(Triple(byteCursor, pair.first, pair.second))
         }
         // 首个匹配前的内容作为"前言"章（并提取简介，对齐原版行为）
-        val firstCharStart = marks.firstKey()
+        val firstCharStart = sortedMarks.firstKey()
         val headContent = content.substring(0, firstCharStart)
         if (headContent.isNotBlank()) {
             val headChapter = BookChapter(title = "前言", start = 0, end = byteMarks.first().first)
@@ -578,11 +579,25 @@ class TextFile(private var book: Book) {
             toc.add(headChapter)
             book.intro = if (headContent.length > 600) headContent.take(600) else headContent
         }
-        // 逐匹配生成章节：上一章 end 延伸到本章标题起点，本章 start = 标题行末
+        // 逐匹配生成章节：上一章 end 延伸到本章标题起点，本章 start = 标题行末；
+        // 超长章拆分（对齐原版）：正文超长且开关开启时，上一章转为卷，正文段均分为"章名(n)"小章
         for ((idx, t) in byteMarks.withIndex()) {
             val (titleByteStart, title, titleBytes) = t
             toc.lastOrNull()?.let { last ->
-                last.end = titleByteStart
+                if (book.getSplitLongChapter() && titleByteStart - (last.start ?: 0L) > maxLengthWithToc) {
+                    val lastTitle = last.title
+                    last.end = last.start
+                    last.isVolume = true
+                    last.tag = null
+                    lastVolumeTitle.value = lastTitle
+                    val (chapters, wc) = analyze(last.start!!, titleByteStart)
+                    chapters.forEachIndexed { index, bc ->
+                        bc.title = "$lastTitle(${index + 1})"
+                    }
+                    toc.addAll(chapters)
+                } else {
+                    last.end = titleByteStart
+                }
             }
             val chapter = BookChapter()
             chapter.title = title
