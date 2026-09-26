@@ -11,6 +11,7 @@ import io.legado.app.databinding.ItemBookshelfGrid2Binding
 import io.legado.app.databinding.ItemBookshelfGridBinding
 import io.legado.app.databinding.ItemBookshelfGridGroup2Binding
 import io.legado.app.databinding.ItemBookshelfGridGroupBinding
+import io.legado.app.help.glide.ImageLoader
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.config.AppConfig
 import io.legado.app.utils.gone
@@ -211,18 +212,20 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
             } else if (preview.isEmpty()) {
                 ivCover.visible()
                 llMosaic.gone()
-                ivCover.load(item.cover)
+                // load(null) 会让 Glide 清空图像，这里强制设置默认封面
+                ivCover.setImageResource(R.drawable.image_cover_default)
             } else {
                 ivCover.gone()
                 llMosaic.visible()
                 val views = listOf(ivMosaic1, ivMosaic2, ivMosaic3, ivMosaic4)
                 views.forEachIndexed { i, iv ->
+                    // 先强制占位图，再异步加载真封面（普通ImageView+ImageLoader 直连，稳定可靠）
+                    iv.setImageResource(R.drawable.image_cover_default)
                     val book = preview.getOrNull(i)
-                    if (book == null) {
-                        iv.invisible()
-                    } else {
-                        iv.visible()
-                        iv.load(book, false)
+                    if (book != null) {
+                        ImageLoader.load(iv.context, book.getDisplayCover())
+                            .centerCrop()
+                            .into(iv)
                     }
                 }
             }
@@ -280,18 +283,20 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
             } else if (preview.isEmpty()) {
                 ivCover.visible()
                 llMosaic.gone()
-                ivCover.load(item.cover)
+                // load(null) 会让 Glide 清空图像，这里强制设置默认封面
+                ivCover.setImageResource(R.drawable.image_cover_default)
             } else {
                 ivCover.gone()
                 llMosaic.visible()
                 val views = listOf(ivMosaic1, ivMosaic2, ivMosaic3, ivMosaic4)
                 views.forEachIndexed { i, iv ->
+                    // 先强制占位图，再异步加载真封面（普通ImageView+ImageLoader 直连，稳定可靠）
+                    iv.setImageResource(R.drawable.image_cover_default)
                     val book = preview.getOrNull(i)
-                    if (book == null) {
-                        iv.invisible()
-                    } else {
-                        iv.visible()
-                        iv.load(book, false)
+                    if (book != null) {
+                        ImageLoader.load(iv.context, book.getDisplayCover())
+                            .centerCrop()
+                            .into(iv)
                     }
                 }
             }
