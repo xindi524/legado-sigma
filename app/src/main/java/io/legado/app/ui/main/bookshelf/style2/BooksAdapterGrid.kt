@@ -18,7 +18,7 @@ import io.legado.app.databinding.ItemBookshelfGridBinding
 import io.legado.app.databinding.ItemBookshelfGridGroup2Binding
 import io.legado.app.databinding.ItemBookshelfGridGroupBinding
 import io.legado.app.help.book.isLocal
-import io.legado.app.lib.theme.primaryColor
+import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.lib.theme.primaryTextColor
 import io.legado.app.help.config.AppConfig
 import io.legado.app.utils.gone
@@ -228,7 +228,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                 val ctx = iv.context
                 val bmp = Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888)
                 val c = Canvas(bmp)
-                c.drawColor(ctx.primaryColor)
+                c.drawColor(ctx.backgroundColor)
                 val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = ctx.primaryTextColor
                     textSize = 44f
@@ -251,7 +251,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                 GlobalScope.launch(Dispatchers.IO) {
                     val h = 480
                     val w = h * 3 / 4
-                    val bgColor = ctx.primaryColor
+                    val bgColor = ctx.backgroundColor
                     // 书与子分组按最后阅读时间混排（子分组时间=组内书的最新阅读时间，真进书阅读才更新），取前4
                     val entries = mutableListOf<Pair<Any, Long>>()
                     preview.forEach { b ->
@@ -285,7 +285,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     mosaic.eraseColor(bgColor)
                     val canvas = Canvas(mosaic)
                     // 均匀缝隙（含外框），间隙适中
-                    val gap = 10f
+                    val gap = 8f
                     val cw = w / 2f
                     val ch = h / 2f
                     bitmaps.forEachIndexed { i, bmp ->
@@ -358,7 +358,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                 val ctx = iv.context
                 val bmp = Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888)
                 val c = Canvas(bmp)
-                c.drawColor(ctx.primaryColor)
+                c.drawColor(ctx.backgroundColor)
                 val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = ctx.primaryTextColor
                     textSize = 44f
@@ -381,7 +381,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                 GlobalScope.launch(Dispatchers.IO) {
                     val h = 480
                     val w = h * 3 / 4
-                    val bgColor = ctx.primaryColor
+                    val bgColor = ctx.backgroundColor
                     // 书与子分组按最后阅读时间混排（子分组时间=组内书的最新阅读时间，真进书阅读才更新），取前4
                     val entries = mutableListOf<Pair<Any, Long>>()
                     preview.forEach { b ->
@@ -415,7 +415,7 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
                     mosaic.eraseColor(bgColor)
                     val canvas = Canvas(mosaic)
                     // 均匀缝隙（含外框），间隙适中
-                    val gap = 10f
+                    val gap = 8f
                     val cw = w / 2f
                     val ch = h / 2f
                     bitmaps.forEachIndexed { i, bmp ->
