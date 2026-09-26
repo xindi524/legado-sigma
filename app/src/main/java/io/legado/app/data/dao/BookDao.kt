@@ -79,6 +79,10 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE (`group` & :group) > 0 ORDER BY durChapterTime DESC LIMIT :limit")
     fun getBooksForGroupPreview(group: Long, limit: Int): List<Book>
 
+    // F2 分组拼图：分组的"最后阅读时间" = 组内书的最新 durChapterTime（用于书/子分组混排）
+    @Query("SELECT coalesce(max(durChapterTime), 0) FROM books WHERE (`group` & :group) > 0")
+    fun getGroupLastReadTime(group: Long): Long
+
     // F1 嵌套分组：书架主页专用——显示所有未分组书（网络+本地合并），排除音频/视频/未入书架的书
     @Query(
         """
