@@ -144,7 +144,7 @@ data class Book(
         GSON.fromJsonObject<HashMap<String, String>>(variable).getOrNull() ?: hashMapOf()
     }
 
-    // F3a：本书多选的目录规则名（存 variableMap，免数据库迁移；空列表=跟随全局规则）
+    // F3a：本书多选的目录规则名（存 variableMap，免数据库迁移；空列表=跟随全局规则；分章用合并后的交替正则存 tocUrl）
     fun getSelectedTocRuleNames(): List<String> {
         val json = variableMap["tocRuleNames"] ?: return emptyList()
         return try {
