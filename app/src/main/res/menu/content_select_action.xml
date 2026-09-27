@@ -28,6 +28,11 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_set_chapter_title"
+        android:title="设为章节标题"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_browser"
         android:title="@string/browser"
         app:showAsAction="never" />
