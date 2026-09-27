@@ -111,10 +111,12 @@ class TxtTocRuleDialog(val book: Book?) : BaseDialogFragment(R.layout.dialog_toc
                 }
             }.toString()
             val replacementJs = "var rules = $rulesJson;" +
+                "var r = result;" +
                 "for (var i = 0; i < rules.length; i++) {" +
-                "if (rules[i][1] && new RegExp(rules[i][0], 'm').test(result)) {" +
-                "return result.replace(new RegExp(rules[i][0], 'm'), rules[i][1]);" +
-                "} } result"
+                "if (rules[i][1] && new RegExp(rules[i][0], 'm').test(r)) {" +
+                "r = result.replace(new RegExp(rules[i][0], 'm'), rules[i][1]);" +
+                "break;" +
+                "} } r"
             val callBack = activity as? CallBack
             callBack?.onTocRegexDialogResult(mosaicRegex + TextFile.spaceChars + replacementJs)
             dismissAllowingStateLoss()
