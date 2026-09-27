@@ -105,14 +105,22 @@ class TextFile(private var book: Book) {
             }
         }
         val (toc, wordCount) = analyze(book.tocUrl.split(spaceChars, limit = 2))
-        book.wordCount = StringUtils.wordCountFormat(wordCount)
-        toc.forEachIndexed { index, bookChapter ->
+        var finalToc = toc
+        var finalWordCount = wordCount
+        if (finalToc.isEmpty()) {
+            // F3b 防御：合并正则无匹配时不至于目录为空，按无规则模式均分
+            val (fbToc, fbWc) = analyze()
+            finalToc = fbToc
+            finalWordCount = fbWc
+        }
+        book.wordCount = StringUtils.wordCountFormat(finalWordCount)
+        finalToc.forEachIndexed { index, bookChapter ->
             bookChapter.index = index
             bookChapter.bookUrl = book.bookUrl
             bookChapter.url = MD5Utils.md5Encode16(book.originName + index + bookChapter.title)
         }
-        getWordCount(toc, book)
-        return toc
+        getWordCount(finalToc, book)
+        return finalToc
     }
 
     fun getContent(chapter: BookChapter): String {
