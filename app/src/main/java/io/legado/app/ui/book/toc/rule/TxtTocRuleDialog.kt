@@ -99,7 +99,6 @@ class TxtTocRuleDialog(val book: Book?) : BaseDialogFragment(R.layout.dialog_toc
         }
         tvOk.setOnClickListener {
             // F3a：多选规则合并为一条交替正则，完全复用原版分章流程（字节精度与原版一致）
-            // 各规则的替换串通过分发 JS 生效：命中哪条分支就用哪条的替换串（空替换串=保留原文）
             // 空选=恢复全局单规则竞争
             book?.setSelectedTocRuleNames(selectedNames.toList())
             book?.let { appDb.bookDao.update(it) }
@@ -110,15 +109,8 @@ class TxtTocRuleDialog(val book: Book?) : BaseDialogFragment(R.layout.dialog_toc
                     put(org.json.JSONArray().put(it.rule).put(it.replacement))
                 }
             }.toString()
-            val replacementJs = "var rules = $rulesJson;" +
-                "var r = result;" +
-                "for (var i = 0; i < rules.length; i++) {" +
-                "if (rules[i][1] && new RegExp(rules[i][0], 'm').test(r)) {" +
-                "r = result.replace(new RegExp(rules[i][0], 'm'), rules[i][1]);" +
-                "break;" +
-                "} } r"
             val callBack = activity as? CallBack
-            callBack?.onTocRegexDialogResult(mosaicRegex + TextFile.spaceChars + replacementJs)
+            callBack?.onTocRegexDialogResult(mosaicRegex)
             dismissAllowingStateLoss()
         }
     }
