@@ -1582,8 +1582,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             toastOnUi("未选中文字")
             return
         }
-        val title = if (selectedText.length > 50) selectedText.take(50) + "…" else selectedText
-        viewModel.setChapterTitleManually(book, ReadBook.durChapterIndex, selectedText, title)
+        viewModel.setChapterTitleManually(book, ReadBook.durChapterIndex, selectedText)
     }
 
     override fun onTocRegexDialogResult(tocRegex: String) {
