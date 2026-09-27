@@ -210,6 +210,23 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
             }
             val norm = { t: String -> t.replace(Regex("\\s+"), "") }
             val selectedNorm = norm(selectedText)
+            // 情形1（前置）：选中文字恰为某章标题（误分章）→ 删除该章并回上一章（设为正文）
+            val dup = chapters.withIndex().firstOrNull { (i, c) -> i > 0 && norm(c.title) == selectedNorm }
+            if (dup != null) {
+                val k = dup.index
+                chapters[k - 1].end = chapters[k].end
+                chapters.removeAt(k)
+                chapters.forEachIndexed { i, c -> c.index = i }
+                book.totalChapterNum = chapters.size
+                appDb.bookChapterDao.delByBook(book.bookUrl)
+                appDb.bookChapterDao.insert(*chapters.toTypedArray())
+                appDb.bookDao.update(book)
+                ReadBook.durChapterIndex = k - 1
+                ReadBook.durChapterPos = 0
+                ReadBook.onChapterListUpdated(book)
+                return@execute
+            }
+            // 情形2：插新章——定位选中文字所在行，整行文本作标题，正文从该行之后开始
             val lines = raw.split('\n')
             var lineIndex = -1
             var charStart = 0
@@ -224,28 +241,12 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
                 ReadBook.upMsg("未能在章节内容中定位所选文字")
                 return@execute
             }
+            // 字节计算用"原始行"（含行尾\r与行首缩进），避免切进多字节字符出现乱码
+            val rawLine = lines[lineIndex]
             val lineStartByte = cur.start!! + raw.substring(0, charStart).toByteArray(book.fileCharset()).size
-            val lineText = lines[lineIndex].trim()
-            // 情形1：该行文本=某章标题 → 误分章，删除该章并回上一章（设为正文）
-            val dup = chapters.withIndex().firstOrNull { (i, c) -> i > 0 && i != chapterIndex + 1 && c.title == lineText }
-            if (dup != null && dup.index > 0) {
-                val k = dup.index
-                chapters[k - 1].end = chapters[k].end
-                chapters.removeAt(k)
-                chapters.forEachIndexed { i, c -> c.index = i }
-                book.totalChapterNum = chapters.size
-                appDb.bookChapterDao.delByBook(book.bookUrl)
-                appDb.bookChapterDao.insert(*chapters.toTypedArray())
-                appDb.bookDao.update(book)
-                ReadBook.durChapterIndex = k - 1
-                ReadBook.durChapterPos = 0
-                ReadBook.onChapterListUpdated(book)
-                return@execute
-            }
-            // 情形2：插新章——整行文本作标题，正文从该行之后开始（该行不复制进正文）
-            var title = lineText
+            val lineEndByte = lineStartByte + rawLine.toByteArray(book.fileCharset()).size
+            var title = rawLine.trim()
             if (title.length > 50) title = title.take(50) + "…"
-            val lineEndByte = lineStartByte + lineText.toByteArray(book.fileCharset()).size
             val newChapter = io.legado.app.data.entities.BookChapter().apply {
                 this.title = title
                 this.start = lineEndByte
