@@ -44,6 +44,8 @@ import io.legado.app.help.book.isEpub
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isLocalTxt
 import io.legado.app.help.book.isMobi
+import io.legado.app.help.book.isPdf
+import io.legado.app.help.book.isUmd
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.update
 import io.legado.app.help.config.AppConfig
@@ -1575,7 +1577,7 @@ class ReadBookActivity : BaseReadBookActivity(),
             toastOnUi("仅支持本地TXT书籍")
             return
         }
-        val selectedText = binding.readView.getSelectedText().trim()
+        val selectedText = binding.readView.getSelectText().trim()
         if (selectedText.isEmpty()) {
             toastOnUi("未选中文字")
             return
