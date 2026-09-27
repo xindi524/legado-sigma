@@ -29,6 +29,7 @@ import io.legado.app.model.ReadAloud
 import io.legado.app.model.ReadBook
 import io.legado.app.model.SourceCallBack
 import io.legado.app.model.localBook.LocalBook
+import io.legado.app.utils.MD5Utils
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.ui.book.read.page.entities.TextChapter
@@ -193,6 +194,58 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
     /**
      * 加载目录
      */
+    /**
+     * F3b：手动分章——以选中文字为标题，在其所在行行首插入新章（仅本地TXT）
+     */
+    fun setChapterTitleManually(book: Book, chapterIndex: Int, selectedText: String, title: String) {
+        execute {
+            val chapters = appDb.bookChapterDao.getChapterList(book.bookUrl).toMutableList()
+            val cur = chapters.getOrNull(chapterIndex) ?: return@execute
+            val raw = BookHelp.getContent(book, cur)
+            if (raw.isNullOrBlank()) {
+                ReadBook.upMsg("读取章节内容失败")
+                return@execute
+            }
+            // 定位选中文字所在行（空白归一后匹配），行首即新章起点
+            val norm = { t: String -> t.replace(Regex("\\s+"), "") }
+            val selectedNorm = norm(selectedText)
+            val lines = raw.split('\n')
+            var lineIndex = -1
+            var charStart = 0
+            for ((i, line) in lines.withIndex()) {
+                if (norm(line).contains(selectedNorm)) {
+                    lineIndex = i
+                    break
+                }
+                charStart += line.length + 1
+            }
+            if (lineIndex < 0) {
+                ReadBook.upMsg("未能在章节内容中定位所选文字")
+                return@execute
+            }
+            val byteOffset = cur.start!! + raw.substring(0, charStart).toByteArray(book.fileCharset()).size
+            // 构造新章
+            val newChapter = io.legado.app.data.entities.BookChapter().apply {
+                this.title = title
+                this.start = byteOffset
+                this.end = cur.end!!
+                this.bookUrl = book.bookUrl
+                this.url = MD5Utils.md5Encode16(book.originName + "manual" + byteOffset)
+            }
+            cur.end = byteOffset
+            chapters.add(chapterIndex + 1, newChapter)
+            chapters.forEachIndexed { i, c -> c.index = i }
+            book.totalChapterNum = chapters.size
+            appDb.bookChapterDao.delByBook(book.bookUrl)
+            appDb.bookChapterDao.insert(*chapters.toTypedArray())
+            appDb.bookDao.update(book)
+            // 跳转到新章并重载阅读视图
+            ReadBook.durChapterIndex = chapterIndex + 1
+            ReadBook.durChapterPos = 0
+            ReadBook.onChapterListUpdated(book)
+        }
+    }
+
     fun loadChapterList(book: Book) {
         execute {
             if (loadChapterListAwait(book)) {
