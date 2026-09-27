@@ -856,6 +856,11 @@ class ReadBookActivity : BaseReadBookActivity(),
      */
     override fun onMenuItemSelected(itemId: Int): Boolean {
         when (itemId) {
+            R.id.menu_set_chapter_title -> {
+                setChapterTitle()
+                return true
+            }
+
             R.id.menu_aloud -> when (AppConfig.contentSelectSpeakMod) {
                 1 -> lifecycleScope.launch {
                     binding.readView.aloudStartSelect()
@@ -1560,6 +1565,24 @@ class ReadBookActivity : BaseReadBookActivity(),
      * colorSelectDialog
      */
     override fun onDialogDismissed(dialogId: Int) = Unit
+
+    /**
+     * F3b：将长按选中的文字设为章节标题，从其所在行切开新章（仅本地TXT）
+     */
+    private fun setChapterTitle() {
+        val book = ReadBook.book ?: return
+        if (!book.isLocal || book.isEpub || book.isPdf || book.isMobi || book.isUmd) {
+            toastOnUi("仅支持本地TXT书籍")
+            return
+        }
+        val selectedText = binding.readView.getSelectedText().trim()
+        if (selectedText.isEmpty()) {
+            toastOnUi("未选中文字")
+            return
+        }
+        val title = if (selectedText.length > 50) selectedText.take(50) + "…" else selectedText
+        viewModel.setChapterTitleManually(book, ReadBook.durChapterIndex, selectedText, title)
+    }
 
     override fun onTocRegexDialogResult(tocRegex: String) {
         ReadBook.book?.let {
