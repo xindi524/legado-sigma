@@ -224,34 +224,8 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
             if (!item.cover.isNullOrBlank()) {
                 ivCover.load(item.cover)
             } else if (preview.isEmpty() && childGroups.isEmpty()) {
-                // 空组：生成"组名文字封面"（主题底色+组名居中），醒目且与整体风格统一
-                val iv = ivCover
-                val ctx = iv.context
-                val bmp = Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888)
-                val c = Canvas(bmp)
-                c.drawColor(ctx.backgroundColor)
-                val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = ctx.primaryTextColor
-                    textSize = 44f
-                    textAlign = Paint.Align.CENTER
-                }
-                var name = item.groupName
-                while (name.isNotEmpty() && p.measureText(name) > 240f) {
-                    name = name.dropLast(1)
-                }
-                if (name != item.groupName && name.length > 1) {
-                    name = name.dropLast(1) + "…"
-                }
-                c.drawText(name, 150f, 215f, p)
-                // 细边框：与书架背景做小区分
-                val bt = ctx.primaryTextColor
-                val borderPaint = Paint().apply {
-                    color = Color.argb(80, Color.red(bt), Color.green(bt), Color.blue(bt))
-                    style = Paint.Style.STROKE
-                    strokeWidth = 3f
-                }
-                c.drawRoundRect(2f, 2f, 298f, 398f, 11f, 11f, borderPaint)
-                iv.setImageBitmap(bmp)
+                // 空组：显示系统默认封面
+                ivCover.setImageResource(R.drawable.image_cover_default)
             } else {
                 // IO 线程拼合：直属书在前，直属子分组在后（子组封面=自定义>系统默认），共4格
                 val key = item.groupId
@@ -372,34 +346,8 @@ class BooksAdapterGrid(context: Context, callBack: CallBack) :
             if (!item.cover.isNullOrBlank()) {
                 ivCover.load(item.cover)
             } else if (preview.isEmpty() && childGroups.isEmpty()) {
-                // 空组：生成"组名文字封面"（主题底色+组名居中），醒目且与整体风格统一
-                val iv = ivCover
-                val ctx = iv.context
-                val bmp = Bitmap.createBitmap(300, 400, Bitmap.Config.ARGB_8888)
-                val c = Canvas(bmp)
-                c.drawColor(ctx.backgroundColor)
-                val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = ctx.primaryTextColor
-                    textSize = 44f
-                    textAlign = Paint.Align.CENTER
-                }
-                var name = item.groupName
-                while (name.isNotEmpty() && p.measureText(name) > 240f) {
-                    name = name.dropLast(1)
-                }
-                if (name != item.groupName && name.length > 1) {
-                    name = name.dropLast(1) + "…"
-                }
-                c.drawText(name, 150f, 215f, p)
-                // 细边框：与书架背景做小区分
-                val bt = ctx.primaryTextColor
-                val borderPaint = Paint().apply {
-                    color = Color.argb(80, Color.red(bt), Color.green(bt), Color.blue(bt))
-                    style = Paint.Style.STROKE
-                    strokeWidth = 3f
-                }
-                c.drawRoundRect(2f, 2f, 298f, 398f, 11f, 11f, borderPaint)
-                iv.setImageBitmap(bmp)
+                // 空组：显示系统默认封面
+                ivCover.setImageResource(R.drawable.image_cover_default)
             } else {
                 // IO 线程拼合：直属书在前，直属子分组在后（子组封面=自定义>系统默认），共4格
                 val key = item.groupId
