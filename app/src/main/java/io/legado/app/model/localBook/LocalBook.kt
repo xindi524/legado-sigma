@@ -206,7 +206,8 @@ object LocalBook {
         }
 
         if (content.isNullOrEmpty() && !chapter.isVolume) {
-            return null
+            // F3b：手动分章可能产生刻意的空章（标题行下紧邻下一章），渲染为空白页而非"加载正文失败"
+            return "　"
         }
 
         return content
