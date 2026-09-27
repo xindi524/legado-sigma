@@ -1577,7 +1577,8 @@ class ReadBookActivity : BaseReadBookActivity(),
             toastOnUi("仅支持本地TXT书籍")
             return
         }
-        val selectedText = binding.readView.getSelectText().trim()
+        val selectedText = binding.readView.getSelectText()
+            .lines().firstOrNull { it.isNotBlank() }?.trim() ?: ""
         if (selectedText.isEmpty()) {
             toastOnUi("未选中文字")
             return
