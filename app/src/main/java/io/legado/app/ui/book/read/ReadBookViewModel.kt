@@ -296,7 +296,6 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
         }
         return -1
     }
-    }
 
     fun loadChapterList(book: Book) {
         execute {
