@@ -146,7 +146,8 @@ class WebCoverActivity : BaseActivity<ActivityWebCoverBinding>() {
     private fun loadEngine() {
         upEngineBarState()
         val url = when (engine) {
-            "baidu" -> "https://image.baidu.com/s?wd=${enc(keyword)}"
+            // 百度用移动版图片搜索（PC版在手机上不跳转、搜索框不回显、布局不适配）
+            "baidu" -> "https://m.baidu.com/sf/vsearch?pd=image&word=${enc(keyword)}"
             "bing" -> "https://cn.bing.com/images/search?q=${enc(keyword)}"
             "sogou" -> "https://pic.sogou.com/pics?query=${enc(keyword)}"
             "360" -> "https://image.so.com/i?q=${enc(keyword)}"
