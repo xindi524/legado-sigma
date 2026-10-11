@@ -169,6 +169,10 @@
         <activity
             android:name=".ui.book.info.edit.BookInfoEditActivity"
             android:launchMode="singleTask" />
+        <!-- 网页搜索封面 -->
+        <activity
+            android:name=".ui.book.searchcover.WebCoverActivity"
+            android:configChanges="orientation|keyboardHidden|screenSize" />
         <!-- 音频播放界面 -->
         <activity
             android:name="io.legado.app.ui.book.audio.AudioPlayActivity"
