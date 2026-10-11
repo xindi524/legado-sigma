@@ -81,8 +81,9 @@ class BookInfoEditActivity :
     private fun initEvent() = binding.run {
         tvChangeCover.setOnClickListener {
             viewModel.bookData.value?.let {
+                // F4：本地书默认走搜索引擎找封面
                 showDialogFragment(
-                    ChangeCoverDialog(it.name, it.author)
+                    ChangeCoverDialog(it.name, it.author, useEngine = it.isLocal)
                 )
             }
         }
