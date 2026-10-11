@@ -12,7 +12,7 @@
 
     <item
         android:id="@+id/menu_search_engine"
-        android:title="搜索引擎找封面"
+        android:title="网络搜索"
         app:showAsAction="never" />
 
 </menu>
