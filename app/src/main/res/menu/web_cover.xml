@@ -7,24 +7,4 @@
         android:title="搜索关键词"
         app:showAsAction="never" />
 
-    <item
-        android:id="@+id/menu_engine"
-        android:title="搜索引擎"
-        app:showAsAction="never">
-        <menu>
-            <item
-                android:id="@+id/menu_engine_baidu"
-                android:title="百度图片" />
-            <item
-                android:id="@+id/menu_engine_bing"
-                android:title="必应图片" />
-            <item
-                android:id="@+id/menu_engine_sogou"
-                android:title="搜狗图片" />
-            <item
-                android:id="@+id/menu_engine_google"
-                android:title="谷歌图片（需代理）" />
-        </menu>
-    </item>
-
 </menu>
