@@ -3,7 +3,9 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="?android:attr/windowBackground"
+    android:fitsSystemWindows="true">
 
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/tool_bar"
@@ -15,6 +17,24 @@
         app:popupTheme="@style/AppTheme.PopupOverlay"
         app:displayHomeAsUp="false"
         app:fitStatusBar="false" />
+
+    <HorizontalScrollView
+        android:id="@+id/engine_bar"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:background="#2B2B2B"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/engine_container"
+            android:orientation="horizontal"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp" />
+
+    </HorizontalScrollView>
 
     <io.legado.app.ui.widget.anima.RefreshProgressBar
         android:id="@+id/refresh_progress_bar"
