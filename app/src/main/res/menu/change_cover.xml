@@ -10,4 +10,9 @@
         app:showAsAction="always"
         tools:ignore="AlwaysShowAction" />
 
+    <item
+        android:id="@+id/menu_search_engine"
+        android:title="搜索引擎找封面"
+        app:showAsAction="never" />
+
 </menu>
