@@ -122,8 +122,14 @@ class ChangeCoverDialog() : BaseDialogFragment(R.layout.dialog_change_cover),
         when (item?.itemId) {
             R.id.menu_start_stop -> viewModel.startOrStopSearch()
             R.id.menu_search_engine -> {
+                // F4：默认搜"书名by作者"（无作者则仅书名）
+                val kw = if (viewModel.author.isBlank()) {
+                    viewModel.name
+                } else {
+                    "${viewModel.name}by${viewModel.author}"
+                }
                 val intent = Intent(requireContext(), WebCoverActivity::class.java)
-                intent.putExtra("keyword", "${viewModel.name} 封面")
+                intent.putExtra("keyword", kw)
                 searchCoverWeb.launch(intent)
             }
         }
