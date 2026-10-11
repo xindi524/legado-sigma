@@ -2,13 +2,13 @@ package io.legado.app.ui.book.searchcover
 
 import android.annotation.SuppressLint
 import android.content.Intent
-import android.os.Bundle
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.EditText
+import androidx.activity.addCallback
 import io.legado.app.R
 import io.legado.app.base.BaseActivity
 import io.legado.app.databinding.ActivityWebCoverBinding
@@ -35,9 +35,7 @@ class WebCoverActivity : BaseActivity<ActivityWebCoverBinding>() {
         "google" to "谷歌图片"
     )
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(binding.root)
+    override fun onActivityCreated(savedInstanceState: Bundle?) {
         keyword = intent.getStringExtra("keyword") ?: ""
         initView()
         loadEngine()
