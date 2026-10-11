@@ -2,13 +2,18 @@ package io.legado.app.ui.book.searchcover
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
+import android.view.Gravity
+import android.view.ViewGroup
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.activity.addCallback
 import io.legado.app.R
 import io.legado.app.base.BaseActivity
@@ -20,7 +25,7 @@ import io.legado.app.utils.viewbindingdelegate.viewBinding
 import java.net.URLEncoder
 
 /**
- * F4：网页搜封面——打开搜索引擎图片页，长按图片设为封面
+ * F4：网络搜索封面——打开搜索引擎图片页浏览，长按图片设为封面
  */
 class WebCoverActivity : BaseActivity<ActivityWebCoverBinding>() {
 
@@ -29,31 +34,31 @@ class WebCoverActivity : BaseActivity<ActivityWebCoverBinding>() {
     private var engine = "baidu"
     private var keyword = ""
 
-    private val engineNames = mapOf(
-        "baidu" to "百度图片",
-        "bing" to "必应图片",
-        "sogou" to "搜狗图片",
-        "google" to "谷歌图片"
+    private val engines = linkedMapOf(
+        "baidu" to "百度",
+        "bing" to "Bing",
+        "sogou" to "搜狗",
+        "360" to "360",
+        "google" to "Google"
     )
+    private val engineViews = hashMapOf<String, TextView>()
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         keyword = intent.getStringExtra("keyword") ?: ""
         initView()
+        buildEngineBar()
         loadEngine()
     }
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun initView() = binding.run {
         toolBar.setBackgroundColor(primaryColor)
+        toolBar.title = "网络搜索"
         toolBar.inflateMenu(R.menu.web_cover)
         toolBar.menu.applyTint(this@WebCoverActivity)
         toolBar.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 R.id.menu_search_keyword -> showKeywordDialog()
-                R.id.menu_engine_baidu -> { engine = "baidu"; loadEngine() }
-                R.id.menu_engine_bing -> { engine = "bing"; loadEngine() }
-                R.id.menu_engine_sogou -> { engine = "sogou"; loadEngine() }
-                R.id.menu_engine_google -> { engine = "google"; loadEngine() }
             }
             true
         }
@@ -76,8 +81,8 @@ class WebCoverActivity : BaseActivity<ActivityWebCoverBinding>() {
         webView.setOnLongClickListener {
             val result = webView.hitTestResult
             val url = result.extra
-            if ((result.type == android.webkit.WebView.HitTestResult.IMAGE_TYPE
-                        || result.type == android.webkit.WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE)
+            if ((result.type == WebView.HitTestResult.IMAGE_TYPE
+                        || result.type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE)
                 && !url.isNullOrBlank() && url.startsWith("http")
             ) {
                 showSetCoverDialog(url)
@@ -93,19 +98,58 @@ class WebCoverActivity : BaseActivity<ActivityWebCoverBinding>() {
                 finish()
             }
         }
-        upTitle()
     }
 
-    private fun upTitle() {
-        binding.toolBar.title = "搜索封面 · ${engineNames[engine] ?: engine}"
+    /**
+     * 顶部一长条引擎切换栏（仿阅读App：百度/Bing/搜狗/360/Google 点击即切）
+     */
+    private fun buildEngineBar() {
+        binding.engineContainer.removeAllViews()
+        engineViews.clear()
+        for ((key, label) in engines) {
+            val tv = TextView(this).apply {
+                text = label
+                textSize = 15f
+                setPadding(28, 0, 28, 0)
+                gravity = Gravity.CENTER
+                setOnClickListener {
+                    if (engine != key) {
+                        engine = key
+                        loadEngine()
+                    }
+                }
+            }
+            engineViews[key] = tv
+            binding.engineContainer.addView(
+                tv,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            )
+        }
+        upEngineBarState()
+    }
+
+    private fun upEngineBarState() {
+        for ((key, tv) in engineViews) {
+            if (key == engine) {
+                tv.setTextColor(Color.WHITE)
+                tv.paint.isFakeBoldText = true
+            } else {
+                tv.setTextColor(Color.parseColor("#999999"))
+                tv.paint.isFakeBoldText = false
+            }
+        }
     }
 
     private fun loadEngine() {
-        upTitle()
+        upEngineBarState()
         val url = when (engine) {
             "baidu" -> "https://image.baidu.com/s?wd=${enc(keyword)}"
             "bing" -> "https://cn.bing.com/images/search?q=${enc(keyword)}"
             "sogou" -> "https://pic.sogou.com/pics?query=${enc(keyword)}"
+            "360" -> "https://image.so.com/i?q=${enc(keyword)}"
             "google" -> "https://www.google.com/search?q=${enc(keyword)}&udm=2"
             else -> return
         }
