@@ -80,12 +80,9 @@ class WebCoverActivity : BaseActivity<ActivityWebCoverBinding>() {
             override fun onPageFinished(view: WebView, url: String) {
                 if (engine != "baidu") return
                 if (pendingBaiduAutoSearch && !url.contains("vsearch")) {
-                    // 预热首页加载完：填入关键词并自动跳搜索结果页
-                    fillSearchBox(view)
-                    view.postDelayed({
-                        pendingBaiduAutoSearch = false
-                        view.loadUrl(baiduSearchUrl())
-                    }, 600)
+                    // 预热首页加载完：改写表单提交到图片搜索接口（带完整页面状态，避开直接访问的302）
+                    pendingBaiduAutoSearch = false
+                    view.postDelayed({ submitBaiduSearch(view) }, 800)
                 } else {
                     // 结果页或用户浏览的其他页：若搜索框未回显词则填入
                     fillSearchBox(view)
@@ -190,13 +187,41 @@ class WebCoverActivity : BaseActivity<ActivityWebCoverBinding>() {
      */
     private fun fillSearchBox(view: WebView) {
         if (engine != "baidu" || keyword.isBlank()) return
-        val jsKw = keyword.replace("\\", "\\\\").replace("'", "\\'")
+        val jsKw = escapeJs(keyword)
         val js = "(function(){var ks=document.querySelectorAll(" +
                 "'#index-kw,#kw,input[name=word],input[name=word1]');" +
                 "for(var i=0;i<ks.length;i++){if(!ks[i].value){ks[i].value='$jsKw';}}})()"
         view.evaluateJavascript(js, null)
         view.postDelayed({ view.evaluateJavascript(js, null) }, 800)
     }
+
+    /**
+     * 在百度首页填入关键词并把表单提交到移动版图片搜索接口：
+     * 页面内表单提交带 Referer/Cookie 等完整状态，比直接 loadUrl 结果页更不容易被反爬拦截
+     */
+    private fun submitBaiduSearch(view: WebView) {
+        val jsKw = escapeJs(keyword)
+        val js = "(function(){" +
+                "var k=document.querySelector('#index-kw');" +
+                "var f=document.querySelector('#index-form');" +
+                "if(!k||!f)return 'no-form';" +
+                "k.value='$jsKw';" +
+                "k.dispatchEvent(new Event('input',{bubbles:true}));" +
+                "f.setAttribute('action','/sf/vsearch');" +
+                "var pd=document.createElement('input');" +
+                "pd.type='hidden';pd.name='pd';pd.value='image';" +
+                "f.appendChild(pd);" +
+                "f.submit();return 'submitted';})()"
+        view.evaluateJavascript(js) { result ->
+            if (result == null || !result.contains("submitted")) {
+                // 表单结构变化时兜底：直接加载结果页
+                view.postDelayed({ view.loadUrl(baiduSearchUrl()) }, 300)
+            }
+        }
+    }
+
+    private fun escapeJs(s: String): String =
+        s.replace("\\", "\\\\").replace("'", "\\'")
 
     private fun showSetCoverDialog(imageUrl: String) {
         alert("设为封面") {
