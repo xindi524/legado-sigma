@@ -236,27 +236,38 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
                 ReadBook.onChapterListUpdated(book)
             }
 
-            // 情形A：选中文字出现在某章"标题行字节区间"[上一章end, 本章start) 内 → 用户选的是章标题 → 删章并回
-            val inTitle = chapters.withIndex().firstOrNull { (i, c) ->
-                i > 0 && c.start != null && indexOfBytes(
-                    bytes, target,
-                    (chapters[i - 1].end ?: 0L).toInt().coerceIn(0, bytes.size),
-                    (c.start ?: -1L).toInt().coerceIn(0, bytes.size)
-                ) >= 0
-            }
-            if (inTitle != null) {
-                removeChapterAndMerge(inTitle.index)
+            // 按"与当前阅读位置的距离"就近排序：同名短标题（如"01"）在书中多次出现时，优先命中用户眼前这一章
+            val nearOrder = chapters.indices.sortedBy { kotlin.math.abs(it - chapterIndex) }
+
+            // 情形B：选中文字恰为某章标题全文 → 删章并回（精确匹配优先）
+            val dupIdx = nearOrder.firstOrNull { i -> i > 0 && norm(chapters[i].title) == selectedNorm }
+            if (dupIdx != null) {
+                removeChapterAndMerge(dupIdx)
                 return@execute
             }
-            // 情形B：选中文字恰为某章标题全文 → 删章并回
-            val dup = chapters.withIndex().firstOrNull { (i, c) -> i > 0 && norm(c.title) == selectedNorm }
-            if (dup != null) {
-                removeChapterAndMerge(dup.index)
+            // 情形A：选中文字出现在某章"标题行字节区间"[上一章end, 本章start) 内 → 用户选的是章标题的一部分 → 删章并回
+            val inTitleIdx = nearOrder.firstOrNull { i ->
+                if (i <= 0) return@firstOrNull false
+                val rangeStart = (chapters[i - 1].end ?: 0L).toInt().coerceIn(0, bytes.size)
+                val rangeEnd = (chapters[i].start ?: -1L).toInt().coerceIn(0, bytes.size)
+                rangeEnd - rangeStart in 1..2048 && indexOfBytes(bytes, target, rangeStart, rangeEnd) >= 0
+            }
+            if (inTitleIdx != null) {
+                removeChapterAndMerge(inTitleIdx)
                 return@execute
             }
-            // 字节级搜索选中文字（优先从当前章开始，找不到再全文）
-            val from = (chapters.getOrNull(chapterIndex)?.start ?: 0L).toInt().coerceIn(0, bytes.size)
-            var hit = indexOfBytes(bytes, target, from)
+            // 字节级搜索选中文字：①当前章正文内 ②相邻章区间 ③全文
+            val curIdx = chapterIndex.coerceIn(0, (chapters.size - 1).coerceAtLeast(0))
+            val curStart = (chapters[curIdx].start ?: 0L).toInt().coerceIn(0, bytes.size)
+            val curEnd = (chapters[curIdx].end ?: fileSize).toInt().coerceIn(0, bytes.size)
+            var hit = indexOfBytes(bytes, target, curStart, curEnd)
+            if (hit < 0) {
+                val nearStart = (chapters.getOrNull(curIdx - 1)?.start
+                    ?: chapters[curIdx].start ?: 0L).toInt().coerceIn(0, bytes.size)
+                val nearEnd = (chapters.getOrNull(curIdx + 1)?.end
+                    ?: chapters[curIdx].end ?: fileSize).toInt().coerceIn(0, bytes.size)
+                hit = indexOfBytes(bytes, target, nearStart, nearEnd)
+            }
             if (hit < 0) {
                 hit = indexOfBytes(bytes, target, 0)
             }
@@ -271,9 +282,9 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
             while (lineEnd < bytes.size && bytes[lineEnd] != 0x0A.toByte()) lineEnd++
             val lineText = String(bytes, lineStart, lineEnd - lineStart, charset).trim()
             // 情形C：整行文本恰为某章标题 → 误章回正文
-            val dup2 = chapters.withIndex().firstOrNull { (i, c) -> i > 0 && norm(c.title) == norm(lineText) }
-            if (dup2 != null) {
-                removeChapterAndMerge(dup2.index)
+            val dup2Idx = nearOrder.firstOrNull { i -> i > 0 && norm(chapters[i].title) == norm(lineText) }
+            if (dup2Idx != null) {
+                removeChapterAndMerge(dup2Idx)
                 return@execute
             }
             // 校验：该行必须位于某章正文区间 [start, end) 内
