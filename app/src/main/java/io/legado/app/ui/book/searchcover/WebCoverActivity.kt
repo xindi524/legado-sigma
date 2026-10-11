@@ -72,6 +72,11 @@ class WebCoverActivity : BaseActivity<ActivityWebCoverBinding>() {
                 view: WebView,
                 request: WebResourceRequest
             ): Boolean = false
+
+            override fun onPageFinished(view: WebView, url: String) {
+                // 百度移动版搜索框不回显URL里的词，页面加载完用JS填入
+                fillSearchBox(view)
+            }
         }
         webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
@@ -147,14 +152,26 @@ class WebCoverActivity : BaseActivity<ActivityWebCoverBinding>() {
         upEngineBarState()
         val url = when (engine) {
             // 百度用移动版图片搜索（PC版在手机上不跳转、搜索框不回显、布局不适配）
-            "baidu" -> "https://m.baidu.com/sf/vsearch?pd=image&word=${enc(keyword)}"
-            "bing" -> "https://cn.bing.com/images/search?q=${enc(keyword)}"
+            "baidu" -> "https://m.baidu.com/sf/vsearch?pd=image&word=${enc(keyword)}"            "bing" -> "https://cn.bing.com/images/search?q=${enc(keyword)}"
             "sogou" -> "https://pic.sogou.com/pics?query=${enc(keyword)}"
             "360" -> "https://image.so.com/i?q=${enc(keyword)}"
             "google" -> "https://www.google.com/search?q=${enc(keyword)}&udm=2"
             else -> return
         }
         binding.webView.loadUrl(url)
+    }
+
+    /**
+     * 百度移动版搜索框不回显URL词，页面加载完JS注入填入（含延迟重试，防SPA未渲染完）
+     */
+    private fun fillSearchBox(view: WebView) {
+        if (engine != "baidu" || keyword.isBlank()) return
+        val jsKw = keyword.replace("\\", "\\\\").replace("'", "\\'")
+        val js = "(function(){var ks=document.querySelectorAll(" +
+                "'#index-kw,#kw,input[name=word],input[name=word1]');" +
+                "for(var i=0;i<ks.length;i++){if(!ks[i].value){ks[i].value='$jsKw';}}})()"
+        view.evaluateJavascript(js, null)
+        view.postDelayed({ view.evaluateJavascript(js, null) }, 800)
     }
 
     private fun showSetCoverDialog(imageUrl: String) {
