@@ -1,9 +1,11 @@
 package io.legado.app.ui.book.info.edit
 
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.core.view.WindowInsetsCompat
 import io.legado.app.R
@@ -19,6 +21,7 @@ import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isVideo
 import io.legado.app.help.book.removeType
 import io.legado.app.ui.book.changecover.ChangeCoverDialog
+import io.legado.app.ui.book.searchcover.WebCoverActivity
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.MD5Utils
@@ -42,6 +45,12 @@ class BookInfoEditActivity :
             coverChangeTo(uri)
         }
     }
+    private val searchCoverWeb =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            result.data?.getStringExtra("cover")?.let { cover ->
+                coverChangeTo(cover)
+            }
+        }
 
     override val binding by viewBinding(ActivityBookInfoEditBinding::inflate)
     override val viewModel by viewModels<BookInfoEditViewModel>()
@@ -81,9 +90,16 @@ class BookInfoEditActivity :
     private fun initEvent() = binding.run {
         tvChangeCover.setOnClickListener {
             viewModel.bookData.value?.let {
-                // F4：本地书默认走搜索引擎找封面
                 showDialogFragment(
-                    ChangeCoverDialog(it.name, it.author, useEngine = it.isLocal)
+                    ChangeCoverDialog(it.name, it.author)
+                )
+            }
+        }
+        tvSearchCoverWeb.setOnClickListener {
+            viewModel.book?.let {
+                searchCoverWeb.launch(
+                    Intent(this, WebCoverActivity::class.java)
+                        .putExtra("keyword", "${it.name} 封面")
                 )
             }
         }
