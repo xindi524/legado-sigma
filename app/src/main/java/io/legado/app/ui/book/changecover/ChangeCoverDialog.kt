@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
-import android.widget.EditText
 import androidx.appcompat.widget.Toolbar
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle.State.STARTED
@@ -13,7 +12,6 @@ import androidx.recyclerview.widget.GridLayoutManager
 import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.databinding.DialogChangeCoverBinding
-import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.setLayout
@@ -30,11 +28,10 @@ class ChangeCoverDialog() : BaseDialogFragment(R.layout.dialog_change_cover),
     Toolbar.OnMenuItemClickListener,
     CoverAdapter.CallBack {
 
-    constructor(name: String, author: String, useEngine: Boolean = false) : this() {
+    constructor(name: String, author: String) : this() {
         arguments = Bundle().apply {
             putString("name", name)
             putString("author", author)
-            putBoolean("useEngine", useEngine)
         }
     }
 
@@ -53,19 +50,11 @@ class ChangeCoverDialog() : BaseDialogFragment(R.layout.dialog_change_cover),
 
     override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
         binding.toolBar.setBackgroundColor(primaryColor)
+        binding.toolBar.setTitle(R.string.change_cover_source)
         viewModel.initData(arguments)
-        upTitle()
         initMenu()
         initView()
         initData()
-    }
-
-    private fun upTitle() {
-        binding.toolBar.title = if (viewModel.engine.isEmpty()) {
-            getString(R.string.change_cover_source)
-        } else {
-            "${viewModel.engineNames[viewModel.engine] ?: viewModel.engine} · 点右上角切换"
-        }
     }
 
     private fun initMenu() {
@@ -121,39 +110,8 @@ class ChangeCoverDialog() : BaseDialogFragment(R.layout.dialog_change_cover),
     override fun onMenuItemClick(item: MenuItem?): Boolean {
         when (item?.itemId) {
             R.id.menu_start_stop -> viewModel.startOrStopSearch()
-            R.id.menu_search_keyword -> showKeywordDialog()
-            R.id.menu_engine_baidu -> switchEngine("baidu")
-            R.id.menu_engine_bing -> switchEngine("bing")
-            R.id.menu_engine_sogou -> switchEngine("sogou")
-            R.id.menu_engine_google -> switchEngine("google")
-            R.id.menu_engine_source -> switchEngine("")
         }
         return false
-    }
-
-    private fun switchEngine(engineKey: String) {
-        viewModel.searchFromEngine(engineKey)
-        upTitle()
-    }
-
-    private fun showKeywordDialog() {
-        val editText = EditText(requireContext()).apply {
-            setText(viewModel.keyword.ifBlank { "${viewModel.name} 封面" })
-            setSingleLine()
-            setPadding(48, 32, 48, 0)
-        }
-        requireContext().alert("搜索关键词") {
-            customView { editText }
-            positiveButton("搜索") {
-                val kw = editText.text.toString().trim()
-                if (kw.isNotEmpty()) {
-                    viewModel.keyword = kw
-                    viewModel.searchFromEngine(viewModel.engine.ifEmpty { "baidu" })
-                    upTitle()
-                }
-            }
-            negativeButton(android.R.string.cancel)
-        }
     }
 
     override fun changeTo(coverUrl: String) {
