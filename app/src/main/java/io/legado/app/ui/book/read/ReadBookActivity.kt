@@ -1577,6 +1577,22 @@ class ReadBookActivity : BaseReadBookActivity(),
             toastOnUi("仅支持本地TXT书籍")
             return
         }
+        // 位置驱动：取选区起始行的整行文本 + 是否标题渲染行 + 页所属章（消除同名文字歧义）
+        runCatching {
+            val pageView = binding.readView.curPage
+            val selPos = pageView.selectStartPos
+            if (selPos.relativePagePos == 0 && selPos.isSelected()) {
+                val textPage = pageView.textPage
+                val line = textPage.lines.getOrNull(selPos.lineIndex)
+                if (line != null && line.text.isNotBlank()) {
+                    viewModel.setChapterTitleManually(
+                        book, ReadBook.durChapterIndex, line.text.trim(),
+                        line.isTitle, textPage.chapterIndex
+                    )
+                    return
+                }
+            }
+        }
         val selectedText = binding.readView.getSelectText()
             .lines().firstOrNull { it.isNotBlank() }?.trim() ?: ""
         if (selectedText.isEmpty()) {
