@@ -2,6 +2,7 @@ package io.legado.app.ui.book.searchcover
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.os.Bundle
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
