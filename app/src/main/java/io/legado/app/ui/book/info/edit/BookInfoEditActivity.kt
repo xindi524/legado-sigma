@@ -96,11 +96,11 @@ class BookInfoEditActivity :
             }
         }
         tvSearchCoverWeb.setOnClickListener {
-            viewModel.book?.let {
-                searchCoverWeb.launch(
-                    Intent(this, WebCoverActivity::class.java)
-                        .putExtra("keyword", "${it.name} 封面")
-                )
+            viewModel.book?.let { book ->
+                val searchIntent =
+                    Intent(this@BookInfoEditActivity, WebCoverActivity::class.java)
+                searchIntent.putExtra("keyword", "${book.name} 封面")
+                searchCoverWeb.launch(searchIntent)
             }
         }
         tvSelectCover.setOnClickListener {
