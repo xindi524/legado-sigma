@@ -1,9 +1,11 @@
 package io.legado.app.ui.book.changecover
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.widget.Toolbar
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle.State.STARTED
@@ -13,6 +15,7 @@ import io.legado.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.databinding.DialogChangeCoverBinding
 import io.legado.app.lib.theme.primaryColor
+import io.legado.app.ui.book.searchcover.WebCoverActivity
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.viewbindingdelegate.viewBinding
@@ -39,6 +42,14 @@ class ChangeCoverDialog() : BaseDialogFragment(R.layout.dialog_change_cover),
     private val callBack: CallBack? get() = activity as? CallBack
     private val viewModel: ChangeCoverViewModel by viewModels()
     private val adapter by lazy { CoverAdapter(requireContext(), this) }
+
+    // F4：网页搜封面，选中图片回传后走 changeTo 设为封面
+    private val searchCoverWeb =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            result.data?.getStringExtra("cover")?.let { cover ->
+                changeTo(cover)
+            }
+        }
 
     private val startStopMenuItem: MenuItem?
         get() = binding.toolBar.menu.findItem(R.id.menu_start_stop)
@@ -110,6 +121,11 @@ class ChangeCoverDialog() : BaseDialogFragment(R.layout.dialog_change_cover),
     override fun onMenuItemClick(item: MenuItem?): Boolean {
         when (item?.itemId) {
             R.id.menu_start_stop -> viewModel.startOrStopSearch()
+            R.id.menu_search_engine -> {
+                val intent = Intent(requireContext(), WebCoverActivity::class.java)
+                intent.putExtra("keyword", "${viewModel.name} 封面")
+                searchCoverWeb.launch(intent)
+            }
         }
         return false
     }
