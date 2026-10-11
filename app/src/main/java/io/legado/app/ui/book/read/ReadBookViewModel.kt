@@ -195,24 +195,25 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
      * 加载目录
      */
     /**
-     * F3b：手动分章（仅本地TXT，字节级定位零漂移）
-     * 1) 选中的文字编码后在文件原始字节中搜索定位，标题自动扩展为其所在整行（行文本含 / —— 等符号照常）
-     * 2) 新章正文从该行之后开始（该行不复制进正文），上一章延伸到该行行首
-     * 3) 选中文字若是某章标题行的全部或一部分（误分章），删除该章、内容并回上一章，并回到原阅读位置
+     * F3b：手动分章（仅本地TXT，字节级定位零漂移，位置驱动消歧）
+     * fromTitleLine=true：选区起始行是标题渲染行 → 直接撤销该章（按页所属章定位，无文字歧义）
+     * fromTitleLine=false：选中的是正文行 → 用整行文本在文件字节中定位，行扩展为整行后插章；
+     *   定位顺序：①页所属章正文 ②相邻章正文 ③标题行区间(撤销) ④全文；行落在章间隙时撤销其后第一个章
      */
-    fun setChapterTitleManually(book: Book, chapterIndex: Int, selectedText: String) {
+    fun setChapterTitleManually(
+        book: Book,
+        chapterIndex: Int,
+        selectedText: String,
+        fromTitleLine: Boolean = false,
+        pageChapterIndex: Int = -1
+    ) {
         execute {
             val chapters = appDb.bookChapterDao.getChapterList(book.bookUrl).toMutableList()
+            if (chapters.isEmpty()) return@execute
             val charset = book.fileCharset()
             val bytes = LocalBook.getBookInputStream(book).use { it.readBytes() }
             val fileSize = bytes.size.toLong()
             val norm = { t: String -> t.replace(Regex("\\s+"), "") }
-            val selectedNorm = norm(selectedText)
-            val target = selectedText.toByteArray(charset)
-            if (selectedNorm.isEmpty() || target.isEmpty()) {
-                ReadBook.upMsg("未选中有效文字")
-                return@execute
-            }
             // 删除第 k 章（k>0）：内容并回上一章；定位到被删章正文起点在合并章中的字符位置（回到原阅读处）
             fun removeChapterAndMerge(k: Int) {
                 val prev = chapters[k - 1]
@@ -236,37 +237,59 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
                 ReadBook.onChapterListUpdated(book)
             }
 
-            // 按"与当前阅读位置的距离"就近排序：同名短标题（如"01"）在书中多次出现时，优先命中用户眼前这一章
-            val nearOrder = chapters.indices.sortedBy { kotlin.math.abs(it - chapterIndex) }
+            // 情形T：选区起始行是标题渲染行 → 撤销该章（位置精确，不做文字比较）
+            if (fromTitleLine) {
+                val k = if (pageChapterIndex in 1 until chapters.size) {
+                    pageChapterIndex
+                } else {
+                    val nearOrder = chapters.indices.sortedBy { kotlin.math.abs(it - chapterIndex) }
+                    nearOrder.firstOrNull { i -> i > 0 && norm(chapters[i].title) == norm(selectedText) } ?: -1
+                }
+                if (k > 0) {
+                    removeChapterAndMerge(k)
+                } else {
+                    ReadBook.upMsg("无法撤销该标题")
+                }
+                return@execute
+            }
 
-            // 情形B：选中文字恰为某章标题全文 → 删章并回（精确匹配优先）
-            val dupIdx = nearOrder.firstOrNull { i -> i > 0 && norm(chapters[i].title) == selectedNorm }
-            if (dupIdx != null) {
-                removeChapterAndMerge(dupIdx)
+            val target = selectedText.toByteArray(charset)
+            if (target.isEmpty()) {
+                ReadBook.upMsg("未选中有效文字")
                 return@execute
             }
-            // 情形A：选中文字出现在某章"标题行字节区间"[上一章end, 本章start) 内 → 用户选的是章标题的一部分 → 删章并回
-            val inTitleIdx = nearOrder.firstOrNull { i ->
-                if (i <= 0) return@firstOrNull false
-                val rangeStart = (chapters[i - 1].end ?: 0L).toInt().coerceIn(0, bytes.size)
-                val rangeEnd = (chapters[i].start ?: -1L).toInt().coerceIn(0, bytes.size)
-                rangeEnd - rangeStart in 1..2048 && indexOfBytes(bytes, target, rangeStart, rangeEnd) >= 0
+            // 字节级定位选中行：①页所属章正文区间 ②相邻章正文 ③标题行区间(就近,撤销) ④全文
+            val pageIdx = if (pageChapterIndex in chapters.indices) {
+                pageChapterIndex
+            } else {
+                chapterIndex.coerceIn(0, chapters.size - 1)
             }
-            if (inTitleIdx != null) {
-                removeChapterAndMerge(inTitleIdx)
-                return@execute
-            }
-            // 字节级搜索选中文字：①当前章正文内 ②相邻章区间 ③全文
-            val curIdx = chapterIndex.coerceIn(0, (chapters.size - 1).coerceAtLeast(0))
-            val curStart = (chapters[curIdx].start ?: 0L).toInt().coerceIn(0, bytes.size)
-            val curEnd = (chapters[curIdx].end ?: fileSize).toInt().coerceIn(0, bytes.size)
-            var hit = indexOfBytes(bytes, target, curStart, curEnd)
+            val pageStart = (chapters[pageIdx].start ?: 0L).toInt().coerceIn(0, bytes.size)
+            val pageEnd = (chapters[pageIdx].end ?: fileSize).toInt().coerceIn(0, bytes.size)
+            var hit = indexOfBytes(bytes, target, pageStart, pageEnd)
             if (hit < 0) {
-                val nearStart = (chapters.getOrNull(curIdx - 1)?.start
-                    ?: chapters[curIdx].start ?: 0L).toInt().coerceIn(0, bytes.size)
-                val nearEnd = (chapters.getOrNull(curIdx + 1)?.end
-                    ?: chapters[curIdx].end ?: fileSize).toInt().coerceIn(0, bytes.size)
-                hit = indexOfBytes(bytes, target, nearStart, nearEnd)
+                val prevStart = (chapters.getOrNull(pageIdx - 1)?.start
+                    ?: chapters[pageIdx].start ?: 0L).toInt().coerceIn(0, bytes.size)
+                hit = indexOfBytes(bytes, target, prevStart, pageStart)
+            }
+            if (hit < 0) {
+                val nextEnd = (chapters.getOrNull(pageIdx + 1)?.end
+                    ?: chapters[pageIdx].end ?: fileSize).toInt().coerceIn(0, bytes.size)
+                hit = indexOfBytes(bytes, target, pageEnd, nextEnd)
+            }
+            if (hit < 0) {
+                // 标题行区间（就近优先）→ 长按的是章标题文字 → 撤销该章
+                val nearOrder = chapters.indices.sortedBy { kotlin.math.abs(it - pageIdx) }
+                val titleIdx = nearOrder.firstOrNull { i ->
+                    if (i <= 0) return@firstOrNull false
+                    val rangeStart = (chapters[i - 1].end ?: 0L).toInt().coerceIn(0, bytes.size)
+                    val rangeEnd = (chapters[i].start ?: -1L).toInt().coerceIn(0, bytes.size)
+                    rangeEnd - rangeStart in 1..2048 && indexOfBytes(bytes, target, rangeStart, rangeEnd) >= 0
+                }
+                if (titleIdx != null) {
+                    removeChapterAndMerge(titleIdx)
+                    return@execute
+                }
             }
             if (hit < 0) {
                 hit = indexOfBytes(bytes, target, 0)
@@ -280,13 +303,6 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
             while (lineStart > 0 && bytes[lineStart - 1] != 0x0A.toByte()) lineStart--
             var lineEnd = hit
             while (lineEnd < bytes.size && bytes[lineEnd] != 0x0A.toByte()) lineEnd++
-            val lineText = String(bytes, lineStart, lineEnd - lineStart, charset).trim()
-            // 情形C：整行文本恰为某章标题 → 误章回正文
-            val dup2Idx = nearOrder.firstOrNull { i -> i > 0 && norm(chapters[i].title) == norm(lineText) }
-            if (dup2Idx != null) {
-                removeChapterAndMerge(dup2Idx)
-                return@execute
-            }
             // 校验：该行必须位于某章正文区间 [start, end) 内
             val ownerIdx = chapters.indexOfFirst { c ->
                 (c.start ?: 0L) <= lineStart && lineStart < (c.end ?: fileSize)
@@ -304,7 +320,7 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
             }
             val owner = chapters[ownerIdx]
             // 插新章：正文从该行换行之后开始（该行不复制进正文），上一章延伸到该行行首
-            var title = lineText
+            var title = String(bytes, lineStart, lineEnd - lineStart, charset).trim()
             if (title.length > 50) title = title.take(50) + "…"
             val newStart = if (lineEnd < bytes.size) (lineEnd + 1).toLong() else fileSize
             val newChapter = io.legado.app.data.entities.BookChapter().apply {
