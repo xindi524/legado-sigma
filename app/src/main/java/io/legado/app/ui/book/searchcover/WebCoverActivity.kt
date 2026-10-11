@@ -33,6 +33,10 @@ class WebCoverActivity : BaseActivity<ActivityWebCoverBinding>() {
 
     private var engine = "baidu"
     private var keyword = ""
+    // 百度结果页需要会话Cookie，新WebView直接访问会被踢回首页；先访问一次首页预热
+    private var baiduWarmed = false
+    // 仅在预热导航后自动跳搜索结果页，避免干扰用户后续浏览
+    private var pendingBaiduAutoSearch = false
 
     private val engines = linkedMapOf(
         "baidu" to "百度",
@@ -74,8 +78,18 @@ class WebCoverActivity : BaseActivity<ActivityWebCoverBinding>() {
             ): Boolean = false
 
             override fun onPageFinished(view: WebView, url: String) {
-                // 百度移动版搜索框不回显URL里的词，页面加载完用JS填入
-                fillSearchBox(view)
+                if (engine != "baidu") return
+                if (pendingBaiduAutoSearch && !url.contains("vsearch")) {
+                    // 预热首页加载完：填入关键词并自动跳搜索结果页
+                    fillSearchBox(view)
+                    view.postDelayed({
+                        pendingBaiduAutoSearch = false
+                        view.loadUrl(baiduSearchUrl())
+                    }, 600)
+                } else {
+                    // 结果页或用户浏览的其他页：若搜索框未回显词则填入
+                    fillSearchBox(view)
+                }
             }
         }
         webView.webChromeClient = object : WebChromeClient() {
@@ -150,16 +164,26 @@ class WebCoverActivity : BaseActivity<ActivityWebCoverBinding>() {
 
     private fun loadEngine() {
         upEngineBarState()
-        val url = when (engine) {
-            // 百度用移动版图片搜索（PC版在手机上不跳转、搜索框不回显、布局不适配）
-            "baidu" -> "https://m.baidu.com/sf/vsearch?pd=image&word=${enc(keyword)}"            "bing" -> "https://cn.bing.com/images/search?q=${enc(keyword)}"
-            "sogou" -> "https://pic.sogou.com/pics?query=${enc(keyword)}"
-            "360" -> "https://image.so.com/i?q=${enc(keyword)}"
-            "google" -> "https://www.google.com/search?q=${enc(keyword)}&udm=2"
-            else -> return
+        when (engine) {
+            "baidu" -> {
+                if (!baiduWarmed) {
+                    // 先访问百度移动版首页建立会话Cookie，否则直接进结果页会被302踢回首页
+                    baiduWarmed = true
+                    pendingBaiduAutoSearch = true
+                    binding.webView.loadUrl("https://m.baidu.com/")
+                } else {
+                    binding.webView.loadUrl(baiduSearchUrl())
+                }
+            }
+            "bing" -> binding.webView.loadUrl("https://cn.bing.com/images/search?q=${enc(keyword)}")
+            "sogou" -> binding.webView.loadUrl("https://pic.sogou.com/pics?query=${enc(keyword)}")
+            "360" -> binding.webView.loadUrl("https://image.so.com/i?q=${enc(keyword)}")
+            "google" -> binding.webView.loadUrl("https://www.google.com/search?q=${enc(keyword)}&udm=2")
         }
-        binding.webView.loadUrl(url)
     }
+
+    private fun baiduSearchUrl(): String =
+        "https://m.baidu.com/sf/vsearch?pd=image&word=${enc(keyword)}"
 
     /**
      * 百度移动版搜索框不回显URL词，页面加载完JS注入填入（含延迟重试，防SPA未渲染完）
