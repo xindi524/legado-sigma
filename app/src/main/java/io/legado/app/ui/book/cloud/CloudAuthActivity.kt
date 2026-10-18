@@ -44,8 +44,11 @@ class CloudAuthActivity : BaseActivity<ActivityCloudAuthBinding>() {
 
             override fun onPageFinished(view: WebView, url: String) {
                 checkLoginSuccess(url)
-                // 调试：标题栏显示当前地址，便于定位授权页问题（正式版移除）
-                binding.toolBar.title = url.take(80)
+                // 调试：当前地址自动复制到剪贴板，粘贴发回即可定位问题
+                val cm = getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                    as android.content.ClipboardManager
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("url", url))
+                binding.toolBar.title = "当前地址已复制，请粘贴反馈"
             }
         }
         binding.webView.webChromeClient = object : WebChromeClient() {
