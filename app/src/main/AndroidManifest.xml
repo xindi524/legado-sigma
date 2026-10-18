@@ -289,6 +289,14 @@
         <activity
             android:name=".ui.book.import.remote.RemoteBookActivity"
             android:launchMode="singleTop" />
+        <!-- 云端书库：百度网盘 -->
+        <activity
+            android:name=".ui.book.cloud.CloudLibraryActivity"
+            android:launchMode="singleTop" />
+        <!-- 百度网盘授权 -->
+        <activity
+            android:name=".ui.book.cloud.CloudAuthActivity"
+            android:configChanges="orientation|keyboardHidden|screenSize" />
         <!-- 发现界面 -->
         <activity
             android:name=".ui.book.explore.ExploreShowActivity"
