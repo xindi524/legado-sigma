@@ -27,6 +27,7 @@ import io.legado.app.utils.FileDoc
 import io.legado.app.utils.find
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.showHelp
+import io.legado.app.utils.startActivity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.launch
