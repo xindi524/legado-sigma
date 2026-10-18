@@ -43,6 +43,11 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/menu_baidu_pan"
+        android:title="百度网盘"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_help"
         android:icon="@drawable/ic_help"
         android:title="@string/help"
