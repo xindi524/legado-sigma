@@ -29,6 +29,9 @@ class CloudAuthActivity : BaseActivity<ActivityCloudAuthBinding>() {
         binding.webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
+            // 标准 Chrome 移动版 UA，避免百度给 WebView 渲染极简页
+            userAgentString =
+                "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
         }
         binding.webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(
