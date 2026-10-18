@@ -90,6 +90,13 @@
         app:layout="@layout/view_preference_category">
 
         <io.legado.app.lib.prefs.Preference
+            android:icon="@drawable/ic_outline_cloud_24"
+            android:key="cloudLibrary"
+            android:summary="浏览网盘书籍，下载并导入书架"
+            android:title="云端书库"
+            app:iconSpaceReserved="false" />
+
+        <io.legado.app.lib.prefs.Preference
             android:icon="@drawable/ic_bookmark"
             android:key="bookmark"
             android:summary="@string/all_bookmark"
