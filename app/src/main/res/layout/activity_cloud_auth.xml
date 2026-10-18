@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?android:attr/windowBackground"
+    android:fitsSystemWindows="true">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/tool_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:elevation="5dp"
+        android:theme="?attr/actionBarStyle"
+        app:titleTextAppearance="@style/ToolbarTitle"
+        app:popupTheme="@style/AppTheme.PopupOverlay"
+        app:displayHomeAsUp="false" />
+
+    <io.legado.app.ui.widget.anima.RefreshProgressBar
+        android:id="@+id/refresh_progress_bar"
+        android:layout_width="match_parent"
+        android:layout_height="2dp" />
+
+    <WebView
+        android:id="@+id/web_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+</LinearLayout>
