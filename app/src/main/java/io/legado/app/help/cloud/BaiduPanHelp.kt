@@ -17,9 +17,18 @@ import java.io.File
  */
 object BaiduPanHelp {
 
+    /**
+     * 百度网盘开放平台应用凭据（client_id / AppKey）
+     * 来源：本项目自行申请（pan.baidu.com/union → 个人使用档，免审核，限10个授权用户）
+     * 若需更换：登录开放平台控制台 → 应用详情 → 复制 AppKey 替换下方常量即可
+     * 注意：授权回调地址需在开放平台「应用详情 → 安全设置」中配置为
+     *       http://openapi.baidu.com/oauth/2.0/login_success
+     */
+    const val CLIENT_ID = "APi4NwmgHDVEi0u7L4DavCGKvvSVsWHe"
+
     const val AUTH_URL =
         "https://openapi.baidu.com/oauth/2.0/authorize?response_type=token" +
-                "&client_id=0H55GTtjZRe7BQhzxUaMx7rE7I2Rgi3j" +
+                "&client_id=$CLIENT_ID" +
                 "&redirect_uri=http://openapi.baidu.com/oauth/2.0/login_success" +
                 "&scope=basic,netdisk&display=mobile&force_login=1"
     private const val PAN_HOST = "https://pan.baidu.com"
