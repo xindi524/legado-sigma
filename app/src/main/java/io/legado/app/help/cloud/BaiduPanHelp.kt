@@ -75,7 +75,7 @@ object BaiduPanHelp {
         for (p in params) {
             val kv = p.split("=", limit = 2)
             when (kv.getOrNull(0)) {
-                "accesstoken" -> token = kv.getOrNull(1)
+                "access_token", "accesstoken" -> token = kv.getOrNull(1)
                 "expires_in" -> expiresIn = kv.getOrNull(1)?.toLongOrNull() ?: 0L
             }
         }
