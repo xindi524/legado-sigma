@@ -44,6 +44,8 @@ class CloudAuthActivity : BaseActivity<ActivityCloudAuthBinding>() {
 
             override fun onPageFinished(view: WebView, url: String) {
                 checkLoginSuccess(url)
+                // 调试：标题栏显示当前地址，便于定位授权页问题（正式版移除）
+                binding.toolBar.title = url.take(80)
             }
         }
         binding.webView.webChromeClient = object : WebChromeClient() {
