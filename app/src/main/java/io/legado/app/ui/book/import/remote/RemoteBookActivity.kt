@@ -19,6 +19,7 @@ import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.backgroundColor
 import io.legado.app.model.remote.RemoteBook
 import io.legado.app.ui.about.AppLogDialog
+import io.legado.app.ui.book.cloud.CloudLibraryActivity
 import io.legado.app.ui.book.import.BaseImportBookActivity
 import io.legado.app.ui.widget.SelectActionBar
 import io.legado.app.utils.ArchiveUtils
@@ -117,6 +118,7 @@ class RemoteBookActivity : BaseImportBookActivity<RemoteBookViewModel>(),
             R.id.menu_server_config -> showDialogFragment<ServersDialog>()
             R.id.menu_log -> showDialogFragment<AppLogDialog>()
             R.id.menu_help -> showHelp("webDavBookHelp")
+            R.id.menu_baidu_pan -> startActivity<CloudLibraryActivity>()
             R.id.menu_sort_name -> {
                 item.isChecked = true
                 sortCheck(RemoteBookSort.Name)
