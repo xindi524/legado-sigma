@@ -106,9 +106,29 @@ object BaiduPanHelp {
     }
 
     /**
-     * 列出网盘目录
+     * 创建网盘目录（百度 create 接口会自动创建父目录）
      */
-    suspend fun list(dir: String): List<CloudFile> {
+    private suspend fun createDir(path: String): Boolean = withContext(IO) {
+        val token = prefs.getString(KEY_TOKEN, null) ?: return@withContext false
+        val url = "$PAN_HOST/rest/2.0/xpan/file?method=create&access_token=$token"
+        val body = okhttp3.FormBody.Builder()
+            .add("path", path)
+            .add("isdir", "1")
+            .add("block_list", "[]")
+            .build()
+        val request = Request.Builder().url(url)
+            .header("User-Agent", DOWNLOAD_UA)
+            .post(body)
+            .build()
+        try {
+            val resp = okHttpClient.newCall(request).await().body?.string() ?: return@withContext false
+            JSONObject(resp).optInt("errno", -1) == 0
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private suspend fun fetchList(dir: String): List<CloudFile> {
         val json = apiGet(
             mapOf(
                 "method" to "list",
@@ -131,6 +151,24 @@ object BaiduPanHelp {
                     isDir = item.optInt("isdir") == 1
                 )
             )
+        }
+        return result
+    }
+
+    /**
+     * 列出网盘目录；目录不存在（errno 9/-9）时自动创建后重试一次
+     */
+    suspend fun list(dir: String): List<CloudFile> {
+        val result = try {
+            fetchList(dir)
+        } catch (e: Exception) {
+            val msg = e.message ?: ""
+            if (msg.contains("errno=-9") || msg.contains("errno=9")) {
+                createDir(dir)
+                fetchList(dir)
+            } else {
+                throw e
+            }
         }
         return result.sortedWith(
             compareByDescending<CloudFile> { it.isDir }.thenBy { it.name }
