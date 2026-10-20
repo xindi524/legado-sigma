@@ -58,6 +58,15 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
         binding.recyclerView.layoutManager = LinearLayoutManager(this)
         binding.recyclerView.adapter = adapter
         binding.tvBreadcrumb.setOnClickListener { upToParent() }
+        binding.etSearch.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                doSearch()
+                true
+            } else {
+                false
+            }
+        }
+        binding.btnSearch.setOnClickListener { doSearch() }
         binding.btnAuth.setOnClickListener {
             authLauncher.launch(Intent(this, CloudAuthActivity::class.java))
         }
@@ -105,8 +114,43 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
         refresh()
     }
 
+    /**
+     * 搜索：关键词为空恢复当前目录浏览；模糊=全盘递归搜，精确=当前目录内过滤
+     */
+    private fun doSearch() {
+        if (!BaiduPanHelp.hasToken()) return
+        val kw = binding.etSearch.text?.toString()?.trim() ?: ""
+        binding.refreshProgressBar.isAutoLoading = true
+        lifecycleScope.launch {
+            try {
+                if (kw.isEmpty()) {
+                    val list = BaiduPanHelp.list(currentDir)
+                    adapter.setItems(list)
+                    binding.tvBreadcrumb.text = currentDir
+                    return@launch
+                }
+                if (binding.switchFuzzy.isChecked) {
+                    val results = BaiduPanHelp.searchAll(kw)
+                    adapter.setItems(results)
+                    binding.tvBreadcrumb.text = "全盘搜索「$kw」：${results.size} 个结果"
+                } else {
+                    val results = BaiduPanHelp.list(currentDir).filter {
+                        it.name.contains(kw, ignoreCase = true)
+                    }
+                    adapter.setItems(results)
+                    binding.tvBreadcrumb.text = "当前目录搜索「$kw」：${results.size} 个结果"
+                }
+            } catch (e: Exception) {
+                toastOnUi(e.message ?: "搜索失败")
+            } finally {
+                binding.refreshProgressBar.isAutoLoading = false
+            }
+        }
+    }
+
     override fun onFileClick(file: CloudFile) {
         if (file.isDir) {
+            binding.etSearch.setText("")
             currentDir = file.path
             refresh()
             return
