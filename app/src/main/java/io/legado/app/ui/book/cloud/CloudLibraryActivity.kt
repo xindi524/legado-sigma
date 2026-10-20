@@ -36,7 +36,8 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
 
     override val binding by viewBinding(ActivityCloudLibraryBinding::inflate)
 
-    private var currentDir = "/apps"
+    private val uiPrefs by lazy { getSharedPreferences("cloud_pan_ui", 0) }
+    private var currentDir: String = "/"
     private val adapter by lazy { CloudFileAdapter(this, this) }
     private val authLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -61,12 +62,13 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
             authLauncher.launch(Intent(this, CloudAuthActivity::class.java))
         }
         onBackPressedDispatcher.addCallback(this) {
-            if (currentDir != "/apps" && currentDir.startsWith("/apps/")) {
+            if (currentDir != "/") {
                 upToParent()
             } else {
                 finish()
             }
         }
+        currentDir = uiPrefs.getString("last_dir", "/") ?: "/"
         upAuthState()
         if (BaiduPanHelp.hasToken()) {
             refresh()
@@ -88,6 +90,7 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
                 val list = BaiduPanHelp.list(currentDir)
                 adapter.setItems(list)
                 binding.tvBreadcrumb.text = currentDir
+                uiPrefs.edit().putString("last_dir", currentDir).apply()
             } catch (e: Exception) {
                 toastOnUi(e.message ?: "加载失败")
             } finally {
@@ -97,8 +100,8 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
     }
 
     private fun upToParent() {
-        if (currentDir == "/apps") return
-        currentDir = currentDir.substringBeforeLast('/', "/apps")
+        if (currentDir == "/") return
+        currentDir = currentDir.substringBeforeLast('/').ifEmpty { "/" }
         refresh()
     }
 
