@@ -176,6 +176,48 @@ object BaiduPanHelp {
     }
 
     /**
+     * 全盘模糊搜索：从根目录递归遍历，文件/文件夹名不区分大小写匹配关键词
+     * 服务端 search 接口对个人应用不可用（errno 2），采用客户端并发遍历，目录扫描上限 400
+     */
+    suspend fun searchAll(keyword: String): List<CloudFile> = kotlinx.coroutines.coroutineScope {
+        val kw = keyword.lowercase()
+        val visited = HashSet<String>()
+        val results = ArrayList<CloudFile>()
+        var frontier = listOf("/")
+        var scanned = 0
+        val maxScan = 400
+        while (frontier.isNotEmpty() && scanned < maxScan) {
+            val next = ArrayList<String>()
+            val layer = frontier.map { dir ->
+                kotlinx.coroutines.async {
+                    try {
+                        dir to fetchList(dir)
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+            }
+            for (deferred in layer) {
+                val entry = deferred.await() ?: continue
+                scanned++
+                visited.add(entry.first)
+                for (f in entry.second) {
+                    if (f.name.lowercase().contains(kw)) {
+                        results.add(f)
+                    }
+                    if (f.isDir && !visited.contains(f.path)) {
+                        next.add(f.path)
+                    }
+                }
+            }
+            frontier = next.filter { !visited.contains(it) }
+        }
+        results.sortedWith(
+            compareByDescending<CloudFile> { it.isDir }.thenBy { it.name }
+        )
+    }
+
+    /**
      * 获取文件下载直链（返回 info 数组，UA 须为 pan.baidu.com）
      */
     suspend fun getDownloadLink(fsId: Long): String {
