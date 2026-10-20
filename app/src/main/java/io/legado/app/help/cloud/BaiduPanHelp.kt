@@ -176,9 +176,10 @@ object BaiduPanHelp {
     }
 
     /**
-     * 获取文件下载直链
+     * 获取文件下载直链（返回 info 数组，UA 须为 pan.baidu.com）
      */
     suspend fun getDownloadLink(fsId: Long): String {
+        val token = prefs.getString(KEY_TOKEN, null) ?: throw Exception("百度网盘未授权")
         val json = apiGet(
             mapOf(
                 "method" to "filemetas",
@@ -186,11 +187,12 @@ object BaiduPanHelp {
                 "dlink" to "1"
             )
         )
-        val item = json.optJSONArray("list")?.optJSONObject(0)
+        val item = json.optJSONArray("info")?.optJSONObject(0)
+            ?: json.optJSONArray("list")?.optJSONObject(0)
             ?: throw Exception("未获取到下载链接")
-        return item.optString("dlink").also {
-            if (it.isBlank()) throw Exception("下载链接为空")
-        }
+        val dlink = item.optString("dlink")
+        if (dlink.isBlank()) throw Exception("下载链接为空")
+        return if (dlink.contains("access_token=")) dlink else "$dlink&access_token=$token"
     }
 
     /**
