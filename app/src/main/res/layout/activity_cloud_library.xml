@@ -18,6 +18,47 @@
         app:popupTheme="@style/AppTheme.PopupOverlay"
         app:displayHomeAsUp="false" />
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="2dp">
+
+        <EditText
+            android:id="@+id/et_search"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="搜索文件名，清空恢复浏览"
+            android:textSize="14sp"
+            android:inputType="text"
+            android:imeOptions="actionSearch"
+            android:maxLines="1" />
+
+        <Switch
+            android:id="@+id/switch_fuzzy"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:text="模糊"
+            android:textSize="13sp" />
+
+        <ImageView
+            android:id="@+id/btn_search"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:padding="6dp"
+            android:src="@drawable/ic_search"
+            app:tint="?android:attr/textColorPrimary"
+            android:contentDescription="搜索" />
+
+    </LinearLayout>
+
     <TextView
         android:id="@+id/tv_breadcrumb"
         android:layout_width="match_parent"
