@@ -87,6 +87,10 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
             }
         }
         binding.btnSearch.setOnClickListener { doSearch() }
+        binding.btnSearch.setOnLongClickListener {
+            doSearch(allDrives = true)
+            true
+        }
         binding.btnDownloadToggle.setOnClickListener {
             val t = CloudDownloadManager.task ?: return@setOnClickListener
             when (t.state) {
@@ -150,9 +154,10 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
     }
 
     /**
-     * 搜索：只过滤当前目录；精确=包含完整搜索词，模糊=搜索词中≥50%字符命中
+     * 搜索：默认只搜当前目录；长按搜索按钮可全盘搜索
+     * 精确=包含完整搜索词，模糊=搜索词中≥50%字符命中
      */
-    private fun doSearch() {
+    private fun doSearch(allDrives: Boolean = false) {
         if (!BaiduPanHelp.hasToken()) return
         val kw = binding.etSearch.text?.toString()?.trim() ?: ""
         binding.refreshProgressBar.isAutoLoading = true
@@ -166,22 +171,33 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
                 }
                 val fuzzy = binding.switchFuzzy.isChecked
                 val lowerKw = kw.lowercase()
-                val results = BaiduPanHelp.list(currentDir).filter { f ->
-                    val name = f.name.lowercase()
-                    if (fuzzy) {
-                        var hit = 0
-                        for (c in lowerKw) {
-                            if (name.contains(c)) hit++
-                        }
-                        hit * 2 >= lowerKw.length
-                    } else {
-                        name.contains(lowerKw)
+                val results: List<CloudFile>
+                val scopeText: String
+                if (allDrives) {
+                    results = BaiduPanHelp.searchAll(kw, fuzzy) { scanned, found ->
+                        binding.tvBreadcrumb.text = "全盘搜索中…已扫描 $scanned 个文件夹，命中 $found"
                     }
+                    scopeText = "全盘"
+                } else {
+                    results = BaiduPanHelp.list(currentDir).filter { f ->
+                        val name = f.name.lowercase()
+                        if (fuzzy) {
+                            var hit = 0
+                            for (c in lowerKw) {
+                                if (name.contains(c)) hit++
+                            }
+                            hit * 2 >= lowerKw.length
+                        } else {
+                            name.contains(lowerKw)
+                        }
+                    }
+                    scopeText = "当前目录"
                 }
                 adapter.setItems(results)
+                val mode = if (fuzzy) "模糊" else ""
                 binding.tvBreadcrumb.text =
-                    if (fuzzy) "当前目录模糊搜索「$kw」：${results.size} 个结果"
-                    else "当前目录搜索「$kw」：${results.size} 个结果"
+                    "${scopeText}${mode}搜索「$kw」：${results.size} 个结果" +
+                        if (results.isEmpty() && !allDrives) "，长按搜索按钮可全盘搜索" else ""
             } catch (e: Exception) {
                 toastOnUi(e.message ?: "搜索失败")
             } finally {
