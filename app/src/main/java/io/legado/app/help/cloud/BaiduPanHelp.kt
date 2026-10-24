@@ -11,7 +11,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import splitties.init.appCtx
@@ -177,6 +179,56 @@ object BaiduPanHelp {
             }
         }
         return result.sortedWith(
+            compareByDescending<CloudFile> { it.isDir }.thenBy { it.name }
+        )
+    }
+
+    /**
+     * 服务端语义搜索（Readingo 同款 unisearch 接口，瞬时返回全盘匹配）
+     * POST /xpan/unisearch?access_token=..&scene=mcpserver&query=..&search_type=1&num=20，body 为 "{}"
+     * 响应 data[].list[] 内含 path/size/fsid/filename，可直接用于下载
+     */
+    suspend fun unisearch(keyword: String): List<CloudFile> = withContext(IO) {
+        val token = prefs.getString(KEY_TOKEN, null) ?: throw Exception("百度网盘未授权")
+        val query = mapOf(
+            "access_token" to token,
+            "scene" to "mcpserver",
+            "query" to keyword,
+            "search_type" to "1",
+            "num" to "20"
+        )
+        val sb = StringBuilder("$PAN_HOST/xpan/unisearch?")
+        sb.append(query.entries.joinToString("&") {
+            java.net.URLEncoder.encode(it.key, "UTF-8") + "=" + java.net.URLEncoder.encode(it.value, "UTF-8")
+        })
+        val body = "{}".toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
+        val request = Request.Builder().url(sb.toString())
+            .header("User-Agent", DOWNLOAD_UA)
+            .post(body)
+            .build()
+        val resp = okHttpClient.newCall(request).await()
+        val json = JSONObject(resp.body?.string() ?: "{}")
+        if (json.optInt("error_no", -1) != 0) {
+            throw Exception("语义搜索失败 errno=${json.optInt("error_no")}")
+        }
+        val out = ArrayList<CloudFile>()
+        val data = json.optJSONArray("data") ?: JSONArray()
+        for (i in 0 until data.length()) {
+            val list = data.optJSONObject(i)?.optJSONArray("list") ?: continue
+            for (j in 0 until list.length()) {
+                val o = list.optJSONObject(j) ?: continue
+                out.add(
+                    CloudFile(
+                        fsId = o.optLong("fsid"),
+                        path = o.optString("path"),
+                        name = o.optString("filename"),
+                        size = o.optLong("size"),
+                        isDir = o.optInt("isdir") == 1
+                    )
+                )
+            }
+        }
+        out.sortedWith(
             compareByDescending<CloudFile> { it.isDir }.thenBy { it.name }
         )
     }
