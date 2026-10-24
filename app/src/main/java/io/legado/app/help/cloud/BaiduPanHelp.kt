@@ -4,6 +4,8 @@ import android.net.Uri
 import io.legado.app.help.http.await
 import io.legado.app.help.http.okHttpClient
 import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.Request
 import org.json.JSONArray
@@ -179,7 +181,7 @@ object BaiduPanHelp {
      * 全盘模糊搜索：从根目录递归遍历，文件/文件夹名不区分大小写匹配关键词
      * 服务端 search 接口对个人应用不可用（errno 2），采用客户端并发遍历，目录扫描上限 400
      */
-    suspend fun searchAll(keyword: String): List<CloudFile> = kotlinx.coroutines.coroutineScope {
+    suspend fun searchAll(keyword: String): List<CloudFile> = coroutineScope {
         val kw = keyword.lowercase()
         val visited = HashSet<String>()
         val results = ArrayList<CloudFile>()
@@ -189,7 +191,7 @@ object BaiduPanHelp {
         while (frontier.isNotEmpty() && scanned < maxScan) {
             val next = ArrayList<String>()
             val layer = frontier.map { dir ->
-                kotlinx.coroutines.async {
+                async {
                     try {
                         dir to fetchList(dir)
                     } catch (e: Exception) {
