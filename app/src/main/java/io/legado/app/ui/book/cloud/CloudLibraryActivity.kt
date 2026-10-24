@@ -15,9 +15,9 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import io.legado.app.R
 import io.legado.app.base.BaseActivity
 import io.legado.app.databinding.ActivityCloudLibraryBinding
-import io.legado.app.exception.NoBooksDirException
 import io.legado.app.help.cloud.BaiduPanHelp
 import io.legado.app.help.cloud.BaiduPanHelp.CloudFile
+import io.legado.app.help.cloud.CloudDownloadManager
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
@@ -30,7 +30,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import splitties.init.appCtx
-import java.io.File
 
 /**
  * F5：云端书库——百度网盘目录浏览、下载并导入书架
@@ -45,7 +44,6 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
     private var currentDir: String = "/"
     private val adapter by lazy { CloudFileAdapter(this, this) }
     private var pendingFile: CloudFile? = null
-    private var downloading = false
 
     /**
      * 选择书籍保存位置（仿导入本地书籍的授权设计）
@@ -89,6 +87,15 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
             }
         }
         binding.btnSearch.setOnClickListener { doSearch() }
+        binding.btnDownloadToggle.setOnClickListener {
+            val t = CloudDownloadManager.task ?: return@setOnClickListener
+            when (t.state) {
+                CloudDownloadManager.State.RUNNING -> CloudDownloadManager.pause()
+                CloudDownloadManager.State.PAUSED -> CloudDownloadManager.resume()
+                else -> CloudDownloadManager.clear()
+            }
+        }
+        CloudDownloadManager.onUpdate = { showDownloadState() }
         binding.btnAuth.setOnClickListener {
             authLauncher.launch(Intent(this, CloudAuthActivity::class.java))
         }
@@ -101,9 +108,15 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
         }
         currentDir = uiPrefs.getString("last_dir", "/") ?: "/"
         upAuthState()
+        showDownloadState()
         if (BaiduPanHelp.hasToken()) {
             refresh()
         }
+    }
+
+    override fun onDestroy() {
+        CloudDownloadManager.onUpdate = null
+        super.onDestroy()
     }
 
     private fun upAuthState() {
@@ -200,10 +213,14 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
             alert("导入已有文件") {
                 setMessage("「${file.name}」已在书籍保存位置，直接加入书架？")
                 positiveButton("导入") {
-                    downloadAndImport(file, existingUri = existing)
+                    importExisting(existing)
                 }
                 negativeButton("取消")
             }
+            return
+        }
+        if (CloudDownloadManager.task?.state == CloudDownloadManager.State.RUNNING) {
+            toastOnUi("已有文件在下载中，请先暂停或等待完成")
             return
         }
         alert("下载并导入") {
@@ -212,7 +229,7 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
                     "将保存到「书籍保存位置」设定的文件夹（设置→其他可修改），网盘原件不受影响。"
             )
             positiveButton("下载") {
-                downloadAndImport(file)
+                CloudDownloadManager.start(file)
             }
             negativeButton("取消")
         }
@@ -236,49 +253,47 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
         }
     }
 
-    private fun downloadAndImport(file: CloudFile, existingUri: Uri? = null) {
-        if (downloading) {
-            toastOnUi("有文件正在下载，请稍候")
-            return
-        }
-        downloading = true
-        if (existingUri == null) toastOnUi("开始下载：${file.name}")
+    private fun importExisting(uri: Uri) {
         lifecycleScope.launch {
             try {
-                val uri: Uri = existingUri ?: withContext(Dispatchers.IO) {
-                    // 下载到临时缓存 → 复制到用户授权的书籍保存位置 → 删缓存
-                    val tmp = File(appCtx.cacheDir, "cloud_${file.name}")
-                    try {
-                        BaiduPanHelp.download(file.fsId, tmp)
-                        LocalBook.saveBookFile(tmp.inputStream(), file.name)
-                    } catch (e: NoBooksDirException) {
-                        // 书籍保存位置不可用（未设置或权限被撤销）：重新弹窗引导，选完自动继续
-                        withContext(Dispatchers.Main) {
-                            toastOnUi("书籍保存位置不可用，请重新选择")
-                            pendingFile = file
-                            alertSelectBookFolder()
-                        }
-                        throw Exception("请重新选择书籍保存位置")
-                    } catch (e: SecurityException) {
-                        withContext(Dispatchers.Main) {
-                            toastOnUi("书籍保存位置不可用，请重新选择")
-                            pendingFile = file
-                            alertSelectBookFolder()
-                        }
-                        throw Exception("请重新选择书籍保存位置")
-                    } finally {
-                        tmp.delete()
-                    }
-                }
                 val book = withContext(Dispatchers.IO) {
                     LocalBook.importFile(uri)
                 }
                 toastOnUi("《${book.name}》已加入书架")
             } catch (e: Exception) {
                 toastOnUi("导入失败：${e.message}")
-            } finally {
-                downloading = false
             }
+        }
+    }
+
+    /**
+     * 显示下载任务状态（任务由 CloudDownloadManager 后台执行，不随页面销毁）
+     */
+    private fun showDownloadState() {
+        val t = CloudDownloadManager.task
+        if (t == null) {
+            binding.downloadBar.visibility = View.GONE
+            return
+        }
+        binding.downloadBar.visibility = View.VISIBLE
+        val pct = if (t.file.size > 0) {
+            (t.downloaded * 100 / t.file.size).toInt().coerceIn(0, 100)
+        } else 0
+        binding.tvDownloadText.text = when (t.state) {
+            CloudDownloadManager.State.RUNNING -> "下载中「${t.file.name}」$pct%"
+            CloudDownloadManager.State.PAUSED -> "已暂停「${t.file.name}」$pct%"
+            CloudDownloadManager.State.DONE -> "已完成「${t.file.name}」"
+            CloudDownloadManager.State.FAILED -> "下载失败「${t.file.name}」"
+        }
+        binding.btnDownloadToggle.text = when (t.state) {
+            CloudDownloadManager.State.RUNNING -> "暂停"
+            CloudDownloadManager.State.PAUSED -> "继续"
+            else -> "清除"
+        }
+        if (t.state == CloudDownloadManager.State.FAILED && t.needReselect) {
+            t.needReselect = false
+            pendingFile = t.file
+            alertSelectBookFolder()
         }
     }
 
