@@ -250,15 +250,20 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
                         BaiduPanHelp.download(file.fsId, tmp)
                         LocalBook.saveBookFile(tmp.inputStream(), file.name)
                     } catch (e: NoBooksDirException) {
-                        // 书籍保存位置不可用（如授权被撤销）：回退应用私有目录
-                        toastOnUi("书籍保存位置不可用，已保存到应用私有目录")
-                        BaiduPanHelp.download(
-                            file.fsId,
-                            File(
-                                appCtx.getExternalFilesDir(null) ?: appCtx.filesDir,
-                                "cloudBooks/${file.name}"
-                            )
-                        ).let { Uri.fromFile(it) }
+                        // 书籍保存位置不可用（未设置或权限被撤销）：重新弹窗引导，选完自动继续
+                        withContext(Dispatchers.Main) {
+                            toastOnUi("书籍保存位置不可用，请重新选择")
+                            pendingFile = file
+                            alertSelectBookFolder()
+                        }
+                        throw Exception("请重新选择书籍保存位置")
+                    } catch (e: SecurityException) {
+                        withContext(Dispatchers.Main) {
+                            toastOnUi("书籍保存位置不可用，请重新选择")
+                            pendingFile = file
+                            alertSelectBookFolder()
+                        }
+                        throw Exception("请重新选择书籍保存位置")
                     } finally {
                         tmp.delete()
                     }
