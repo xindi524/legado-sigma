@@ -4,7 +4,14 @@ import android.net.Uri
 import io.legado.app.help.http.await
 import io.legado.app.help.http.okHttpClient
 import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.Request
 import org.json.JSONArray
@@ -172,6 +179,61 @@ object BaiduPanHelp {
             }
         }
         return result.sortedWith(
+            compareByDescending<CloudFile> { it.isDir }.thenBy { it.name }
+        )
+    }
+
+    /**
+     * 全盘搜索：从根目录递归遍历（客户端并发池，8 并发，目录上限 400）
+     * 精确：文件名包含完整搜索词（连续子串）
+     * 模糊：搜索词中≥50%的字符出现在文件名即命中
+     * onProgress 实时回调 (已扫描目录数, 已命中数)
+     */
+    suspend fun searchAll(
+        keyword: String,
+        fuzzy: Boolean = false,
+        onProgress: (scanned: Int, found: Int) -> Unit = { _, _ -> }
+    ): List<CloudFile> = coroutineScope {
+        val kw = keyword.lowercase()
+        val matcher: (String) -> Boolean = if (fuzzy) {
+            { name ->
+                var hit = 0
+                for (c in kw) {
+                    if (name.contains(c)) hit++
+                }
+                hit * 2 >= kw.length
+            }
+        } else {
+            { name -> name.contains(kw) }
+        }
+        val results = ArrayList<CloudFile>()
+        val mutex = Mutex()
+        val visited = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<String, Boolean>())
+        val scanned = java.util.concurrent.atomic.AtomicInteger(0)
+        val sem = Semaphore(8)
+        fun spawn(dir: String): Job = launch {
+            if (!visited.add(dir)) return@launch
+            val n = scanned.incrementAndGet()
+            if (n > 400) return@launch
+            onProgress(n, results.size)
+            var subdirs: List<String> = emptyList()
+            sem.withPermit {
+                val items = try {
+                    fetchList(dir)
+                } catch (e: Exception) {
+                    emptyList()
+                }
+                val subs = ArrayList<String>()
+                for (f in items) {
+                    if (matcher(f.name.lowercase())) mutex.withLock { results.add(f) }
+                    if (f.isDir) subs.add(f.path)
+                }
+                subdirs = subs
+            }
+            for (d in subdirs) spawn(d)
+        }
+        spawn("/")
+        results.sortedWith(
             compareByDescending<CloudFile> { it.isDir }.thenBy { it.name }
         )
     }
