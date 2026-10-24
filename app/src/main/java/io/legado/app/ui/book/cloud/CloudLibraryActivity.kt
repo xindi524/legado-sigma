@@ -151,22 +151,17 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
                     binding.tvBreadcrumb.text = currentDir
                     return@launch
                 }
-                if (binding.switchFuzzy.isChecked) {
-                    val results = BaiduPanHelp.searchAll(kw) { scanned, found ->
-                        binding.tvBreadcrumb.text = "全盘搜索中…已扫描 $scanned 个文件夹，命中 $found"
-                    }
-                    results.sortedWith(
-                        compareByDescending<CloudFile> { it.isDir }.thenBy { it.name }
-                    )
-                    adapter.setItems(results)
-                    binding.tvBreadcrumb.text = "全盘搜索「$kw」：${results.size} 个结果"
-                } else {
-                    val results = BaiduPanHelp.list(currentDir).filter {
-                        it.name.contains(kw, ignoreCase = true)
-                    }
-                    adapter.setItems(results)
-                    binding.tvBreadcrumb.text = "当前目录搜索「$kw」：${results.size} 个结果"
+                val fuzzy = binding.switchFuzzy.isChecked
+                val results = BaiduPanHelp.searchAll(kw, fuzzy) { scanned, found ->
+                    binding.tvBreadcrumb.text = "全盘搜索中…已扫描 $scanned 个文件夹，命中 $found"
                 }
+                results.sortedWith(
+                    compareByDescending<CloudFile> { it.isDir }.thenBy { it.name }
+                )
+                adapter.setItems(results)
+                binding.tvBreadcrumb.text =
+                    if (fuzzy) "全盘模糊搜索「$kw」：${results.size} 个结果"
+                    else "全盘搜索「$kw」：${results.size} 个结果"
             } catch (e: Exception) {
                 toastOnUi(e.message ?: "搜索失败")
             } finally {
