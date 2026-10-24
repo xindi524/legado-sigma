@@ -164,27 +164,42 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
             toastOnUi("仅支持导入 TXT / EPUB 文件")
             return
         }
+        val saveFile = File(
+            appCtx.getExternalFilesDir(null) ?: appCtx.filesDir,
+            "cloudBooks/${file.name}"
+        )
+        // 已下载过且大小一致：跳过下载直接导入，避免重复占用空间
+        if (saveFile.exists() && saveFile.length() == file.size) {
+            alert("导入已有文件") {
+                setMessage("「${file.name}」此前已下载到本地，直接加入书架？")
+                positiveButton("导入") {
+                    downloadAndImport(file, saveFile, skipDownload = true)
+                }
+                negativeButton("取消")
+            }
+            return
+        }
         alert("下载并导入") {
-            setMessage("将「${file.name}」下载到本地并加入书架？")
+            setMessage(
+                "「${file.name}」（${formatSize(file.size)}）\n\n" +
+                    "阅读需要先将文件下载到应用私有目录，网盘原件不受影响；" +
+                    "不再需要时在书架长按删除该书并勾选「删除文件」，即可释放空间。"
+            )
             positiveButton("下载") {
-                downloadAndImport(file)
+                downloadAndImport(file, saveFile)
             }
             negativeButton("取消")
         }
     }
 
-    private fun downloadAndImport(file: CloudFile) {
-        toastOnUi("开始下载：${file.name}")
+    private fun downloadAndImport(file: CloudFile, saveFile: File, skipDownload: Boolean = false) {
+        if (!skipDownload) toastOnUi("开始下载：${file.name}")
         lifecycleScope.launch {
             try {
-                val saveFile = withContext(Dispatchers.IO) {
-                    BaiduPanHelp.download(
-                        file.fsId,
-                        File(
-                            appCtx.getExternalFilesDir(null) ?: appCtx.filesDir,
-                            "cloudBooks/${file.name}"
-                        )
-                    )
+                if (!skipDownload) {
+                    withContext(Dispatchers.IO) {
+                        BaiduPanHelp.download(file.fsId, saveFile)
+                    }
                 }
                 val book = withContext(Dispatchers.IO) {
                     LocalBook.importFile(Uri.fromFile(saveFile))
@@ -194,6 +209,12 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
                 toastOnUi("导入失败：${e.message}")
             }
         }
+    }
+
+    private fun formatSize(size: Long): String = when {
+        size >= 1024 * 1024 -> String.format("%.1f MB", size / 1048576f)
+        size >= 1024 -> String.format("%.0f KB", size / 1024f)
+        else -> "$size B"
     }
 
     override fun onMenuItemClick(item: MenuItem?): Boolean {
