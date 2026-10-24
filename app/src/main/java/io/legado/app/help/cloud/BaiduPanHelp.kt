@@ -4,8 +4,11 @@ import android.net.Uri
 import io.legado.app.help.http.await
 import io.legado.app.help.http.okHttpClient
 import kotlinx.coroutines.Dispatchers.IO
-import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.Request
 import org.json.JSONArray
@@ -179,44 +182,42 @@ object BaiduPanHelp {
 
     /**
      * 全盘模糊搜索：从根目录递归遍历，文件/文件夹名不区分大小写匹配关键词
-     * 服务端 search 接口对个人应用不可用（errno 2），采用客户端并发遍历，目录扫描上限 400
+     * 服务端 search 接口对个人应用不可用（errno 2），采用客户端并发池遍历（8 并发，目录上限 400）
+     * onProgress 实时回调 (已扫描目录数, 已命中数)
      */
-    suspend fun searchAll(keyword: String): List<CloudFile> = coroutineScope {
+    suspend fun searchAll(
+        keyword: String,
+        onProgress: (scanned: Int, found: Int) -> Unit = { _, _ -> }
+    ): List<CloudFile> = coroutineScope {
         val kw = keyword.lowercase()
-        val visited = HashSet<String>()
         val results = ArrayList<CloudFile>()
-        var frontier = listOf("/")
-        var scanned = 0
-        val maxScan = 400
-        while (frontier.isNotEmpty() && scanned < maxScan) {
-            val next = ArrayList<String>()
-            val layer = frontier.map { dir ->
-                async {
-                    try {
-                        dir to fetchList(dir)
-                    } catch (e: Exception) {
-                        null
-                    }
+        val mutex = Mutex()
+        val visited = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<String, Boolean>())
+        val scanned = java.util.concurrent.atomic.AtomicInteger(0)
+        val sem = Semaphore(8)
+        fun spawn(dir: String) = launch {
+            if (!visited.add(dir)) return@launch
+            val n = scanned.incrementAndGet()
+            if (n > 400) return@launch
+            onProgress(n, results.size)
+            var subdirs: List<String> = emptyList()
+            sem.withPermit {
+                val items = try {
+                    fetchList(dir)
+                } catch (e: Exception) {
+                    emptyList()
                 }
-            }
-            for (deferred in layer) {
-                val entry = deferred.await() ?: continue
-                scanned++
-                visited.add(entry.first)
-                for (f in entry.second) {
-                    if (f.name.lowercase().contains(kw)) {
-                        results.add(f)
-                    }
-                    if (f.isDir && !visited.contains(f.path)) {
-                        next.add(f.path)
-                    }
+                val subs = ArrayList<String>()
+                for (f in items) {
+                    if (f.name.lowercase().contains(kw)) mutex.withLock { results.add(f) }
+                    if (f.isDir) subs.add(f.path)
                 }
+                subdirs = subs
             }
-            frontier = next.filter { !visited.contains(it) }
+            for (d in subdirs) spawn(d)
         }
-        results.sortedWith(
-            compareByDescending<CloudFile> { it.isDir }.thenBy { it.name }
-        )
+        spawn("/")
+        results
     }
 
     /**
