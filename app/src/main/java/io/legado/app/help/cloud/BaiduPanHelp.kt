@@ -8,9 +8,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.Request
@@ -184,7 +182,44 @@ object BaiduPanHelp {
     }
 
     /**
-     * 全盘搜索：从根目录递归遍历（客户端并发池，8 并发，目录上限 400）
+     * 递归收集目录树全部条目（客户端并发池，8 并发，目录上限 400）
+     * onProgress 实时回调 (已扫描目录数, 已收集条目数)
+     */
+    suspend fun collectAll(
+        startDir: String = "/",
+        onProgress: (scanned: Int, found: Int) -> Unit = { _, _ -> }
+    ): List<CloudFile> = coroutineScope {
+        val results = java.util.Collections.synchronizedList(ArrayList<CloudFile>())
+        val visited = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<String, Boolean>())
+        val scanned = java.util.concurrent.atomic.AtomicInteger(0)
+        val sem = Semaphore(8)
+        fun spawn(dir: String): Job = launch {
+            if (!visited.add(dir)) return@launch
+            val n = scanned.incrementAndGet()
+            if (n > 400) return@launch
+            var subdirs: List<String> = emptyList()
+            sem.withPermit {
+                val items = try {
+                    fetchList(dir)
+                } catch (e: Exception) {
+                    emptyList()
+                }
+                val subs = ArrayList<String>()
+                for (f in items) {
+                    results.add(f)
+                    if (f.isDir) subs.add(f.path)
+                }
+                subdirs = subs
+            }
+            onProgress(n, results.size)
+            for (d in subdirs) spawn(d)
+        }
+        spawn(startDir)
+        results
+    }
+
+    /**
+     * 递归搜索目录树（默认从根目录全盘）
      * 精确：文件名包含完整搜索词（连续子串）
      * 模糊：搜索词中≥50%的字符出现在文件名即命中
      * onProgress 实时回调 (已扫描目录数, 已命中数)
@@ -192,8 +227,9 @@ object BaiduPanHelp {
     suspend fun searchAll(
         keyword: String,
         fuzzy: Boolean = false,
+        startDir: String = "/",
         onProgress: (scanned: Int, found: Int) -> Unit = { _, _ -> }
-    ): List<CloudFile> = coroutineScope {
+    ): List<CloudFile> {
         val kw = keyword.lowercase()
         val matcher: (String) -> Boolean = if (fuzzy) {
             { name ->
@@ -206,34 +242,15 @@ object BaiduPanHelp {
         } else {
             { name -> name.contains(kw) }
         }
-        val results = ArrayList<CloudFile>()
-        val mutex = Mutex()
-        val visited = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<String, Boolean>())
-        val scanned = java.util.concurrent.atomic.AtomicInteger(0)
-        val sem = Semaphore(8)
-        fun spawn(dir: String): Job = launch {
-            if (!visited.add(dir)) return@launch
-            val n = scanned.incrementAndGet()
-            if (n > 400) return@launch
-            onProgress(n, results.size)
-            var subdirs: List<String> = emptyList()
-            sem.withPermit {
-                val items = try {
-                    fetchList(dir)
-                } catch (e: Exception) {
-                    emptyList()
-                }
-                val subs = ArrayList<String>()
-                for (f in items) {
-                    if (matcher(f.name.lowercase())) mutex.withLock { results.add(f) }
-                    if (f.isDir) subs.add(f.path)
-                }
-                subdirs = subs
-            }
-            for (d in subdirs) spawn(d)
+        val matched = ArrayList<CloudFile>()
+        var scanned = 0
+        for (f in collectAll(startDir) { s, _ ->
+            scanned = s
+            onProgress(s, matched.size)
+        }) {
+            if (matcher(f.name.lowercase())) matched.add(f)
         }
-        spawn("/")
-        results.sortedWith(
+        return matched.sortedWith(
             compareByDescending<CloudFile> { it.isDir }.thenBy { it.name }
         )
     }
