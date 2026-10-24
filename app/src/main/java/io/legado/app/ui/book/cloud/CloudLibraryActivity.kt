@@ -130,7 +130,12 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
                     return@launch
                 }
                 if (binding.switchFuzzy.isChecked) {
-                    val results = BaiduPanHelp.searchAll(kw)
+                    val results = BaiduPanHelp.searchAll(kw) { scanned, found ->
+                        binding.tvBreadcrumb.text = "全盘搜索中…已扫描 $scanned 个文件夹，命中 $found"
+                    }
+                    results.sortedWith(
+                        compareByDescending<CloudFile> { it.isDir }.thenBy { it.name }
+                    )
                     adapter.setItems(results)
                     binding.tvBreadcrumb.text = "全盘搜索「$kw」：${results.size} 个结果"
                 } else {
