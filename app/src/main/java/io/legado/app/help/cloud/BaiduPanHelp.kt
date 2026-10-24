@@ -4,10 +4,12 @@ import android.net.Uri
 import io.legado.app.help.http.await
 import io.legado.app.help.http.okHttpClient
 import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.Request
@@ -195,7 +197,7 @@ object BaiduPanHelp {
         val visited = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<String, Boolean>())
         val scanned = java.util.concurrent.atomic.AtomicInteger(0)
         val sem = Semaphore(8)
-        fun spawn(dir: String) = launch {
+        fun spawn(dir: String): Job = launch {
             if (!visited.add(dir)) return@launch
             val n = scanned.incrementAndGet()
             if (n > 400) return@launch
