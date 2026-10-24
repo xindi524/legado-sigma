@@ -18,6 +18,7 @@ import io.legado.app.databinding.ActivityCloudLibraryBinding
 import io.legado.app.help.cloud.BaiduPanHelp
 import io.legado.app.help.cloud.BaiduPanHelp.CloudFile
 import io.legado.app.help.cloud.CloudDownloadManager
+import io.legado.app.help.cloud.CloudIndexManager
 import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
@@ -100,6 +101,7 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
             }
         }
         CloudDownloadManager.onUpdate = { showDownloadState() }
+        CloudIndexManager.ensureFresh()
         binding.btnAuth.setOnClickListener {
             authLauncher.launch(Intent(this, CloudAuthActivity::class.java))
         }
@@ -154,7 +156,7 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
     }
 
     /**
-     * 搜索：默认只搜当前目录；长按搜索按钮可全盘搜索
+     * 搜索：索引就绪时全盘内存过滤（瞬时）；无索引时递归当前目录；长按强制全盘
      * 精确=包含完整搜索词，模糊=搜索词中≥50%字符命中
      */
     private fun doSearch(allDrives: Boolean = false) {
@@ -173,31 +175,31 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
                 val lowerKw = kw.lowercase()
                 val results: List<CloudFile>
                 val scopeText: String
-                if (allDrives) {
-                    results = BaiduPanHelp.searchAll(kw, fuzzy) { scanned, found ->
-                        binding.tvBreadcrumb.text = "全盘搜索中…已扫描 $scanned 个文件夹，命中 $found"
+                if (CloudIndexManager.isFresh()) {
+                    // 索引就绪：全盘内存过滤，瞬时完成
+                    results = CloudIndexManager.search(kw, fuzzy).map { it.toCloudFile() }
+                    scopeText = "全盘（索引）"
+                    CloudIndexManager.ensureFresh()
+                } else if (allDrives) {
+                    // 长按：全盘扫描（顺便建立索引）
+                    val all = BaiduPanHelp.collectAll("/") { scanned, _ ->
+                        binding.tvBreadcrumb.text = "全盘搜索中…已扫描 $scanned 个文件夹"
                     }
+                    CloudIndexManager.saveFrom(all)
+                    results = filterList(all, lowerKw, fuzzy)
                     scopeText = "全盘"
                 } else {
-                    results = BaiduPanHelp.list(currentDir).filter { f ->
-                        val name = f.name.lowercase()
-                        if (fuzzy) {
-                            var hit = 0
-                            for (c in lowerKw) {
-                                if (name.contains(c)) hit++
-                            }
-                            hit * 2 >= lowerKw.length
-                        } else {
-                            name.contains(lowerKw)
-                        }
+                    // 无索引：递归当前目录（含子文件夹）
+                    results = BaiduPanHelp.searchAll(kw, fuzzy, startDir = currentDir) { scanned, _ ->
+                        binding.tvBreadcrumb.text = "搜索中…已扫描 $scanned 个文件夹"
                     }
-                    scopeText = "当前目录"
+                    scopeText = "当前目录（含子文件夹）"
+                    CloudIndexManager.ensureFresh()
                 }
                 adapter.setItems(results)
                 val mode = if (fuzzy) "模糊" else ""
                 binding.tvBreadcrumb.text =
-                    "${scopeText}${mode}搜索「$kw」：${results.size} 个结果" +
-                        if (results.isEmpty() && !allDrives) "，长按搜索按钮可全盘搜索" else ""
+                    "${scopeText}${mode}搜索「$kw」：${results.size} 个结果"
             } catch (e: Exception) {
                 toastOnUi(e.message ?: "搜索失败")
             } finally {
@@ -205,6 +207,30 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
             }
         }
     }
+
+    private fun filterList(
+        list: List<CloudFile>,
+        lowerKw: String,
+        fuzzy: Boolean
+    ): List<CloudFile> = list.filter { f ->
+        val name = f.name.lowercase()
+        if (fuzzy) {
+            var hit = 0
+            for (c in lowerKw) {
+                if (name.contains(c)) hit++
+            }
+            hit * 2 >= lowerKw.length
+        } else {
+            name.contains(lowerKw)
+        }
+    }.sortedWith(
+        compareByDescending<CloudFile> { it.isDir }.thenBy { it.name }
+    )
+
+    /**
+     * 索引状态提示（预留）
+     */
+    private fun showIndexHint() = Unit
 
     override fun onFileClick(file: CloudFile) {
         if (file.isDir) {
