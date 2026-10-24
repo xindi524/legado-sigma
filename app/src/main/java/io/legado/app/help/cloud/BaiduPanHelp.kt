@@ -1,10 +1,6 @@
 package io.legado.app.help.cloud
 
-import android.content.ContentUris
-import android.content.ContentValues
 import android.net.Uri
-import android.os.Build
-import android.provider.MediaStore
 import io.legado.app.help.http.await
 import io.legado.app.help.http.okHttpClient
 import kotlinx.coroutines.Dispatchers.IO
@@ -45,7 +41,6 @@ object BaiduPanHelp {
     private const val PREF = "cloud_baidu"
     private const val KEY_TOKEN = "access_token"
     private const val KEY_EXPIRES = "expires_at"
-    private const val PUBLIC_RELATIVE = "Download/开源阅读/"
 
     data class CloudFile(
         val fsId: Long,
@@ -255,7 +250,7 @@ object BaiduPanHelp {
     }
 
     /**
-     * 下载到输出流（公共目录 MediaStore 与私有文件共用的底层实现）
+     * 下载到输出流
      */
     suspend fun downloadTo(fsId: Long, output: java.io.OutputStream) = withContext(IO) {
         val dlink = getDownloadLink(fsId)
@@ -267,60 +262,6 @@ object BaiduPanHelp {
         body.byteStream().use { input ->
             input.copyTo(output, 64 * 1024)
         }
-    }
-
-    /**
-     * 下载到公共 Download/开源阅读/ 目录（MediaStore，文件管理器可见、可手动删除）
-     * API < 29 或写入失败时返回 null，由调用方回退到应用私有目录
-     */
-    suspend fun downloadPublic(file: CloudFile): Uri? = withContext(IO) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return@withContext null
-        var uri: Uri? = null
-        try {
-            val resolver = appCtx.contentResolver
-            val values = ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME, file.name)
-                put(
-                    MediaStore.MediaColumns.MIME_TYPE,
-                    if (file.name.endsWith(".epub", true)) "application/epub+zip" else "text/plain"
-                )
-                put(MediaStore.MediaColumns.RELATIVE_PATH, PUBLIC_RELATIVE)
-            }
-            uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                ?: return@withContext null
-            resolver.openOutputStream(uri)?.use { downloadTo(file.fsId, it) }
-                ?: return@withContext null
-            uri
-        } catch (e: Exception) {
-            // 下载失败清理半成品
-            uri?.let { runCatching { appCtx.contentResolver.delete(it, null, null) } }
-            null
-        }
-    }
-
-    /**
-     * 查询公共目录中已下载的同名且同大小的文件，存在返回其 uri（用于跳过重复下载）
-     */
-    fun findPublic(name: String, expectedSize: Long): Uri? = try {
-        val projection = arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.SIZE)
-        appCtx.contentResolver.query(
-            MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-            projection,
-            "${MediaStore.MediaColumns.DISPLAY_NAME}=?",
-            arrayOf(name),
-            null
-        )?.use { c ->
-            while (c.moveToNext()) {
-                if (c.getLong(1) == expectedSize) {
-                    return ContentUris.withAppendedId(
-                        MediaStore.Downloads.EXTERNAL_CONTENT_URI, c.getLong(0)
-                    )
-                }
-            }
-            null
-        }
-    } catch (e: Exception) {
-        null
     }
 
 }
