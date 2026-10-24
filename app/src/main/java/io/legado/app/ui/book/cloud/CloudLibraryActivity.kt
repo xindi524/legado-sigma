@@ -22,6 +22,7 @@ import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.model.localBook.LocalBook
+import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
@@ -43,6 +44,23 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
     private val uiPrefs by lazy { getSharedPreferences("cloud_pan_ui", 0) }
     private var currentDir: String = "/"
     private val adapter by lazy { CloudFileAdapter(this, this) }
+    private var pendingFile: CloudFile? = null
+    private var downloading = false
+
+    /**
+     * 选择书籍保存位置（仿导入本地书籍的授权设计）
+     */
+    private val bookTreeSelect = registerForActivityResult(HandleFileContract()) {
+        it.uri?.let { treeUri ->
+            AppConfig.defaultBookTreeUri = treeUri.toString()
+            pendingFile?.let { f ->
+                pendingFile = null
+                onFileClick(f)
+            }
+        } ?: run {
+            pendingFile = null
+        }
+    }
     private val authLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             if (BaiduPanHelp.hasToken()) {
@@ -168,6 +186,12 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
             toastOnUi("仅支持导入 TXT / EPUB 文件")
             return
         }
+        // 未设置书籍保存位置：仿导入本地书籍的设计弹窗引导授权
+        if (AppConfig.defaultBookTreeUri.isNullOrBlank()) {
+            pendingFile = file
+            alertSelectBookFolder()
+            return
+        }
         // 书籍保存位置已有同名同大小文件：跳过下载直接导入
         val existing = findInBookStore(file.name, file.size)
         if (existing != null) {
@@ -192,6 +216,24 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
         }
     }
 
+    /**
+     * 引导设置书籍保存位置（文案与流程仿导入本地书籍）
+     */
+    private fun alertSelectBookFolder() {
+        try {
+            val storageHelp = String(assets.open("storageHelp.md").readBytes())
+            val hint = getString(R.string.select_book_folder)
+            alert(hint, storageHelp) {
+                okButton {
+                    bookTreeSelect.launch { title = hint }
+                }
+                negativeButton("取消")
+            }
+        } catch (e: Exception) {
+            toastOnUi("请先在 设置→其他→书籍保存位置 中设置文件夹")
+        }
+    }
+
     private fun downloadAndImport(file: CloudFile, existingUri: Uri? = null) {
         if (downloading) {
             toastOnUi("有文件正在下载，请稍候")
@@ -208,7 +250,8 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
                         BaiduPanHelp.download(file.fsId, tmp)
                         LocalBook.saveBookFile(tmp.inputStream(), file.name)
                     } catch (e: NoBooksDirException) {
-                        // 未设置书籍保存位置：回退应用私有目录
+                        // 书籍保存位置不可用（如授权被撤销）：回退应用私有目录
+                        toastOnUi("书籍保存位置不可用，已保存到应用私有目录")
                         BaiduPanHelp.download(
                             file.fsId,
                             File(
@@ -246,8 +289,6 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
     } catch (e: Exception) {
         null
     }
-
-    private var downloading = false
 
     private fun formatSize(size: Long): String = when {
         size >= 1024 * 1024 -> String.format("%.1f MB", size / 1048576f)
