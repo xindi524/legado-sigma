@@ -8,13 +8,17 @@ import android.view.View
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.widget.Toolbar
+import androidx.core.net.toUri
+import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import io.legado.app.R
 import io.legado.app.base.BaseActivity
 import io.legado.app.databinding.ActivityCloudLibraryBinding
+import io.legado.app.exception.NoBooksDirException
 import io.legado.app.help.cloud.BaiduPanHelp
 import io.legado.app.help.cloud.BaiduPanHelp.CloudFile
+import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.dialogs.alert
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.model.localBook.LocalBook
@@ -164,13 +168,13 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
             toastOnUi("仅支持导入 TXT / EPUB 文件")
             return
         }
-        // 公共目录已有同名同大小文件：跳过下载直接导入
-        val existing = BaiduPanHelp.findPublic(file.name, file.size)
+        // 书籍保存位置已有同名同大小文件：跳过下载直接导入
+        val existing = findInBookStore(file.name, file.size)
         if (existing != null) {
             alert("导入已有文件") {
-                setMessage("「${file.name}」已在 Download/开源阅读/ 目录，直接加入书架？")
+                setMessage("「${file.name}」已在书籍保存位置，直接加入书架？")
                 positiveButton("导入") {
-                    downloadAndImport(file, existing, skipDownload = true)
+                    downloadAndImport(file, existingUri = existing)
                 }
                 negativeButton("取消")
             }
@@ -179,40 +183,41 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
         alert("下载并导入") {
             setMessage(
                 "「${file.name}」（${formatSize(file.size)}）\n\n" +
-                    "将下载到手机「Download/开源阅读/」目录（文件管理器可见，可随时手动删除），" +
-                    "网盘原件不受影响。"
+                    "将保存到「书籍保存位置」设定的文件夹（设置→其他可修改），网盘原件不受影响。"
             )
             positiveButton("下载") {
-                downloadAndImport(file, null)
+                downloadAndImport(file)
             }
             negativeButton("取消")
         }
     }
 
-    private fun downloadAndImport(file: CloudFile, existingUri: Uri?, skipDownload: Boolean = false) {
+    private fun downloadAndImport(file: CloudFile, existingUri: Uri? = null) {
         if (downloading) {
             toastOnUi("有文件正在下载，请稍候")
             return
         }
         downloading = true
-        if (!skipDownload) toastOnUi("开始下载：${file.name}")
+        if (existingUri == null) toastOnUi("开始下载：${file.name}")
         lifecycleScope.launch {
             try {
-                val uri: Uri = existingUri ?: run {
-                    // 优先公共目录（文件管理器可见），失败回退应用私有目录
-                    val pub = BaiduPanHelp.downloadPublic(file)
-                    if (pub != null) {
-                        toastOnUi("已保存到 Download/开源阅读/")
-                        pub
-                    } else {
-                        val f = File(
-                            appCtx.getExternalFilesDir(null) ?: appCtx.filesDir,
-                            "cloudBooks/${file.name}"
-                        )
-                        withContext(Dispatchers.IO) {
-                            BaiduPanHelp.download(file.fsId, f)
-                        }
-                        Uri.fromFile(f)
+                val uri: Uri = existingUri ?: withContext(Dispatchers.IO) {
+                    // 下载到临时缓存 → 复制到用户授权的书籍保存位置 → 删缓存
+                    val tmp = File(appCtx.cacheDir, "cloud_${file.name}")
+                    try {
+                        BaiduPanHelp.download(file.fsId, tmp)
+                        LocalBook.saveBookFile(tmp.inputStream(), file.name)
+                    } catch (e: NoBooksDirException) {
+                        // 未设置书籍保存位置：回退应用私有目录
+                        BaiduPanHelp.download(
+                            file.fsId,
+                            File(
+                                appCtx.getExternalFilesDir(null) ?: appCtx.filesDir,
+                                "cloudBooks/${file.name}"
+                            )
+                        ).let { Uri.fromFile(it) }
+                    } finally {
+                        tmp.delete()
                     }
                 }
                 val book = withContext(Dispatchers.IO) {
@@ -225,6 +230,21 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
                 downloading = false
             }
         }
+    }
+
+    /**
+     * 在用户授权的书籍保存位置中查找同名且同大小的文件
+     */
+    private fun findInBookStore(name: String, expectedSize: Long): Uri? = try {
+        val treeUriStr = AppConfig.defaultBookTreeUri
+        if (treeUriStr.isNullOrBlank()) {
+            null
+        } else {
+            DocumentFile.fromTreeUri(this, treeUriStr.toUri())?.findFile(name)
+                ?.takeIf { it.length() == expectedSize }?.uri
+        }
+    } catch (e: Exception) {
+        null
     }
 
     private var downloading = false
