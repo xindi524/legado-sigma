@@ -183,15 +183,28 @@ object BaiduPanHelp {
     }
 
     /**
-     * 全盘模糊搜索：从根目录递归遍历，文件/文件夹名不区分大小写匹配关键词
-     * 服务端 search 接口对个人应用不可用（errno 2），采用客户端并发池遍历（8 并发，目录上限 400）
+     * 全盘搜索：从根目录递归遍历（客户端并发池，8 并发，目录上限 400）
+     * 精确：文件名包含完整搜索词（连续子串）
+     * 模糊：搜索词中≥50%的字符出现在文件名即命中（不要求连续与顺序）
      * onProgress 实时回调 (已扫描目录数, 已命中数)
      */
     suspend fun searchAll(
         keyword: String,
+        fuzzy: Boolean = false,
         onProgress: (scanned: Int, found: Int) -> Unit = { _, _ -> }
     ): List<CloudFile> = coroutineScope {
         val kw = keyword.lowercase()
+        val matcher: (String) -> Boolean = if (fuzzy) {
+            { name ->
+                var hit = 0
+                for (c in kw) {
+                    if (name.contains(c)) hit++
+                }
+                hit * 2 >= kw.length
+            }
+        } else {
+            { name -> name.contains(kw) }
+        }
         val results = ArrayList<CloudFile>()
         val mutex = Mutex()
         val visited = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<String, Boolean>())
@@ -211,7 +224,7 @@ object BaiduPanHelp {
                 }
                 val subs = ArrayList<String>()
                 for (f in items) {
-                    if (f.name.lowercase().contains(kw)) mutex.withLock { results.add(f) }
+                    if (matcher(f.name.lowercase())) mutex.withLock { results.add(f) }
                     if (f.isDir) subs.add(f.path)
                 }
                 subdirs = subs
