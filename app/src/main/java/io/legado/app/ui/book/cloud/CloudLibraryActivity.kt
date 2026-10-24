@@ -156,7 +156,8 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
     }
 
     /**
-     * 搜索：索引就绪时全盘内存过滤（瞬时）；无索引时递归当前目录；长按强制全盘
+     * 搜索链路：①服务端语义搜索（瞬时）②索引内存过滤 ③递归当前目录
+     * 长按搜索按钮跳过语义搜索直接本地全盘扫描
      * 精确=包含完整搜索词，模糊=搜索词中≥50%字符命中
      */
     private fun doSearch(allDrives: Boolean = false) {
@@ -173,33 +174,56 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
                 }
                 val fuzzy = binding.switchFuzzy.isChecked
                 val lowerKw = kw.lowercase()
-                val results: List<CloudFile>
-                val scopeText: String
-                if (CloudIndexManager.isFresh()) {
-                    // 索引就绪：全盘内存过滤，瞬时完成
+                var results: List<CloudFile>? = null
+                var scopeText = ""
+
+                // ①服务端语义搜索（短按且非强制本地时）
+                if (!allDrives) {
+                    try {
+                        val semantic = BaiduPanHelp.unisearch(kw)
+                        if (semantic.isNotEmpty()) {
+                            results = semantic
+                            scopeText = "语义搜索"
+                        }
+                    } catch (e: Exception) {
+                        // 语义搜索不可用，走本地链路
+                    }
+                }
+
+                // ②索引内存过滤
+                if (results == null && CloudIndexManager.isFresh()) {
                     results = CloudIndexManager.search(kw, fuzzy).map { it.toCloudFile() }
                     scopeText = "全盘（索引）"
                     CloudIndexManager.ensureFresh()
-                } else if (allDrives) {
-                    // 长按：全盘扫描（顺便建立索引）
-                    val all = BaiduPanHelp.collectAll("/") { scanned, _ ->
-                        binding.tvBreadcrumb.text = "全盘搜索中…已扫描 $scanned 个文件夹"
-                    }
-                    CloudIndexManager.saveFrom(all)
-                    results = filterList(all, lowerKw, fuzzy)
-                    scopeText = "全盘"
-                } else {
-                    // 无索引：递归当前目录（含子文件夹）
-                    results = BaiduPanHelp.searchAll(kw, fuzzy, startDir = currentDir) { scanned, _ ->
-                        binding.tvBreadcrumb.text = "搜索中…已扫描 $scanned 个文件夹"
-                    }
-                    scopeText = "当前目录（含子文件夹）"
-                    CloudIndexManager.ensureFresh()
                 }
-                adapter.setItems(results)
+
+                // ③本地递归：无语义结果且无索引时，递归当前目录；长按则全盘
+                if (results == null) {
+                    if (allDrives || CloudIndexManager.index == null) {
+                        val start = if (allDrives) "/" else currentDir
+                        results = BaiduPanHelp.searchAll(kw, fuzzy, startDir = start) { scanned, _ ->
+                            binding.tvBreadcrumb.text = "搜索中…已扫描 $scanned 个文件夹"
+                        }
+                        scopeText = if (allDrives) "全盘" else "当前目录（含子文件夹）"
+                        if (allDrives) {
+                            val all = BaiduPanHelp.collectAll("/")
+                            CloudIndexManager.saveFrom(all)
+                        }
+                    } else {
+                        // 有旧索引但已过期：用旧索引先答，同时后台刷新
+                        results = CloudIndexManager.search(kw, fuzzy).map { it.toCloudFile() }
+                        scopeText = "全盘（索引·稍旧）"
+                        CloudIndexManager.ensureFresh()
+                    }
+                }
+
+                results = results?.let { r ->
+                    if (r.isEmpty()) filterList(BaiduPanHelp.list(currentDir), lowerKw, fuzzy) else r
+                }
+                adapter.setItems(results ?: emptyList())
                 val mode = if (fuzzy) "模糊" else ""
                 binding.tvBreadcrumb.text =
-                    "${scopeText}${mode}搜索「$kw」：${results.size} 个结果"
+                    "${scopeText}${mode}搜索「$kw」：${results?.size ?: 0} 个结果"
             } catch (e: Exception) {
                 toastOnUi(e.message ?: "搜索失败")
             } finally {
