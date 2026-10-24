@@ -164,16 +164,13 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
             toastOnUi("仅支持导入 TXT / EPUB 文件")
             return
         }
-        val saveFile = File(
-            appCtx.getExternalFilesDir(null) ?: appCtx.filesDir,
-            "cloudBooks/${file.name}"
-        )
-        // 已下载过且大小一致：跳过下载直接导入，避免重复占用空间
-        if (saveFile.exists() && saveFile.length() == file.size) {
+        // 公共目录已有同名同大小文件：跳过下载直接导入
+        val existing = BaiduPanHelp.findPublic(file.name, file.size)
+        if (existing != null) {
             alert("导入已有文件") {
-                setMessage("「${file.name}」此前已下载到本地，直接加入书架？")
+                setMessage("「${file.name}」已在 Download/开源阅读/ 目录，直接加入书架？")
                 positiveButton("导入") {
-                    downloadAndImport(file, saveFile, skipDownload = true)
+                    downloadAndImport(file, existing, skipDownload = true)
                 }
                 negativeButton("取消")
             }
@@ -182,34 +179,55 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
         alert("下载并导入") {
             setMessage(
                 "「${file.name}」（${formatSize(file.size)}）\n\n" +
-                    "阅读需要先将文件下载到应用私有目录，网盘原件不受影响；" +
-                    "不再需要时在书架长按删除该书并勾选「删除文件」，即可释放空间。"
+                    "将下载到手机「Download/开源阅读/」目录（文件管理器可见，可随时手动删除），" +
+                    "网盘原件不受影响。"
             )
             positiveButton("下载") {
-                downloadAndImport(file, saveFile)
+                downloadAndImport(file, null)
             }
             negativeButton("取消")
         }
     }
 
-    private fun downloadAndImport(file: CloudFile, saveFile: File, skipDownload: Boolean = false) {
+    private fun downloadAndImport(file: CloudFile, existingUri: Uri?, skipDownload: Boolean = false) {
+        if (downloading) {
+            toastOnUi("有文件正在下载，请稍候")
+            return
+        }
+        downloading = true
         if (!skipDownload) toastOnUi("开始下载：${file.name}")
         lifecycleScope.launch {
             try {
-                if (!skipDownload) {
-                    withContext(Dispatchers.IO) {
-                        BaiduPanHelp.download(file.fsId, saveFile)
+                val uri: Uri = existingUri ?: run {
+                    // 优先公共目录（文件管理器可见），失败回退应用私有目录
+                    val pub = BaiduPanHelp.downloadPublic(file)
+                    if (pub != null) {
+                        toastOnUi("已保存到 Download/开源阅读/")
+                        pub
+                    } else {
+                        val f = File(
+                            appCtx.getExternalFilesDir(null) ?: appCtx.filesDir,
+                            "cloudBooks/${file.name}"
+                        )
+                        withContext(Dispatchers.IO) {
+                            BaiduPanHelp.download(file.fsId, f)
+                        }
+                        Uri.fromFile(f)
                     }
                 }
                 val book = withContext(Dispatchers.IO) {
-                    LocalBook.importFile(Uri.fromFile(saveFile))
+                    LocalBook.importFile(uri)
                 }
                 toastOnUi("《${book.name}》已加入书架")
             } catch (e: Exception) {
                 toastOnUi("导入失败：${e.message}")
+            } finally {
+                downloading = false
             }
         }
     }
+
+    private var downloading = false
 
     private fun formatSize(size: Long): String = when {
         size >= 1024 * 1024 -> String.format("%.1f MB", size / 1048576f)
