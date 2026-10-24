@@ -4,6 +4,7 @@ import android.net.Uri
 import io.legado.app.help.http.await
 import io.legado.app.help.http.okHttpClient
 import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import okhttp3.Request
 import org.json.JSONArray
@@ -196,26 +197,31 @@ object BaiduPanHelp {
     }
 
     /**
-     * 下载文件到指定位置
+     * 下载到输出流；支持断点续传（Range）与字节进度回调，响应协程取消（暂停）
      */
-    suspend fun download(fsId: Long, saveFile: File): File = withContext(IO) {
-        saveFile.parentFile?.mkdirs()
-        saveFile.outputStream().use { downloadTo(fsId, it) }
-        saveFile
-    }
-
-    /**
-     * 下载到输出流
-     */
-    suspend fun downloadTo(fsId: Long, output: java.io.OutputStream) = withContext(IO) {
+    suspend fun downloadTo(
+        fsId: Long,
+        output: java.io.OutputStream,
+        startOffset: Long = 0L,
+        onProgress: ((Long) -> Unit)? = null
+    ) = withContext(IO) {
         val dlink = getDownloadLink(fsId)
-        val request = Request.Builder().url(dlink)
+        val builder = Request.Builder().url(dlink)
             .header("User-Agent", DOWNLOAD_UA)
-            .build()
-        val response = okHttpClient.newCall(request).await()
+        if (startOffset > 0) builder.header("Range", "bytes=$startOffset-")
+        val response = okHttpClient.newCall(builder.build()).await()
         val body = response.body ?: throw Exception("下载失败：响应为空")
+        var done = startOffset
         body.byteStream().use { input ->
-            input.copyTo(output, 64 * 1024)
+            val buf = ByteArray(64 * 1024)
+            while (true) {
+                ensureActive()
+                val n = input.read(buf)
+                if (n == -1) break
+                output.write(buf, 0, n)
+                done += n
+                onProgress?.invoke(done)
+            }
         }
     }
 
