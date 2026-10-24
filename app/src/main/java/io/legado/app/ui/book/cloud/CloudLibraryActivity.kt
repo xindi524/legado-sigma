@@ -137,7 +137,7 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
     }
 
     /**
-     * 搜索：关键词为空恢复当前目录浏览；模糊=全盘递归搜，精确=当前目录内过滤
+     * 搜索：只过滤当前目录；精确=包含完整搜索词，模糊=搜索词中≥50%字符命中
      */
     private fun doSearch() {
         if (!BaiduPanHelp.hasToken()) return
@@ -152,16 +152,23 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
                     return@launch
                 }
                 val fuzzy = binding.switchFuzzy.isChecked
-                val results = BaiduPanHelp.searchAll(kw, fuzzy) { scanned, found ->
-                    binding.tvBreadcrumb.text = "全盘搜索中…已扫描 $scanned 个文件夹，命中 $found"
+                val lowerKw = kw.lowercase()
+                val results = BaiduPanHelp.list(currentDir).filter { f ->
+                    val name = f.name.lowercase()
+                    if (fuzzy) {
+                        var hit = 0
+                        for (c in lowerKw) {
+                            if (name.contains(c)) hit++
+                        }
+                        hit * 2 >= lowerKw.length
+                    } else {
+                        name.contains(lowerKw)
+                    }
                 }
-                results.sortedWith(
-                    compareByDescending<CloudFile> { it.isDir }.thenBy { it.name }
-                )
                 adapter.setItems(results)
                 binding.tvBreadcrumb.text =
-                    if (fuzzy) "全盘模糊搜索「$kw」：${results.size} 个结果"
-                    else "全盘搜索「$kw」：${results.size} 个结果"
+                    if (fuzzy) "当前目录模糊搜索「$kw」：${results.size} 个结果"
+                    else "当前目录搜索「$kw」：${results.size} 个结果"
             } catch (e: Exception) {
                 toastOnUi(e.message ?: "搜索失败")
             } finally {
