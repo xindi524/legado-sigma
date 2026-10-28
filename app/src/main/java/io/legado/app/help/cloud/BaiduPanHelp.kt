@@ -271,33 +271,15 @@ object BaiduPanHelp {
     }
 
     /**
-     * 递归搜索目录树（默认从根目录全盘）
-     * 精确：文件名包含完整搜索词（连续子串）
-     * 模糊：搜索词中≥50%的字符出现在文件名即命中
-     * onProgress 实时回调 (已扫描目录数, 已命中数)
+     * 递归搜索目录树（默认从根目录全盘），匹配逻辑由调用方传入
      */
     suspend fun searchAll(
-        keyword: String,
-        fuzzy: Boolean = false,
-        startDir: String = "/",
+        startDir: String,
+        matcher: (String) -> Boolean,
         onProgress: (scanned: Int, found: Int) -> Unit = { _, _ -> }
     ): List<CloudFile> {
-        val kw = keyword.lowercase()
-        val matcher: (String) -> Boolean = if (fuzzy) {
-            { name ->
-                var hit = 0
-                for (c in kw) {
-                    if (name.contains(c)) hit++
-                }
-                hit * 2 >= kw.length
-            }
-        } else {
-            { name -> name.contains(kw) }
-        }
         val matched = ArrayList<CloudFile>()
-        var scanned = 0
         for (f in collectAll(startDir) { s, _ ->
-            scanned = s
             onProgress(s, matched.size)
         }) {
             if (matcher(f.name.lowercase())) matched.add(f)
@@ -305,6 +287,18 @@ object BaiduPanHelp {
         return matched.sortedWith(
             compareByDescending<CloudFile> { it.isDir }.thenBy { it.name }
         )
+    }
+
+    /**
+     * 精确匹配：子序列规则——搜索词每个字符按原顺序出现在文件名中，
+     * 允许缺字漏字与中间间隔，不允许错字与乱序
+     */
+    fun subsequenceMatch(lowerName: String, lowerKw: String): Boolean {
+        var i = 0
+        for (c in lowerName) {
+            if (i < lowerKw.length && c == lowerKw[i]) i++
+        }
+        return i == lowerKw.length
     }
 
     /**
