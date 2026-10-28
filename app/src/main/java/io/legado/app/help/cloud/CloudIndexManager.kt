@@ -134,15 +134,15 @@ object CloudIndexManager {
     }
 
     /**
-     * 用索引做全盘过滤（内存瞬时完成），匹配逻辑由调用方传入
+     * 用索引做全盘过滤（内存瞬时完成），按匹配度打分排序
      */
-    fun search(matcher: (String) -> Boolean): List<Entry> {
+    fun search(lowerKw: String, fuzzy: Boolean): List<Entry> {
         val all = index ?: return emptyList()
-        return all.filter { e ->
-            matcher(e.name.lowercase())
-        }.sortedWith(
-            compareByDescending<Entry> { it.isDir }.thenBy { it.name }
-        )
+        return all.mapNotNull { e ->
+            val score = BaiduPanHelp.matchScore(e.name.lowercase(), lowerKw, fuzzy)
+            if (score >= 0) score to e else null
+        }.sortedByDescending { it.first }
+            .map { it.second }
     }
 
     private fun notifyUpdate(force: Boolean = false) {
