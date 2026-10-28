@@ -15,6 +15,7 @@
         android:id="@+id/iv_icon"
         android:layout_width="24dp"
         android:layout_height="24dp"
+        android:tint="?android:attr/textColorSecondary"
         android:contentDescription="类型"
         tools:src="@drawable/ic_cfg_backup" />
 
