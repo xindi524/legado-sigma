@@ -248,7 +248,7 @@ object BaiduPanHelp {
         fun spawn(dir: String): Job = launch {
             if (!visited.add(dir)) return@launch
             val n = scanned.incrementAndGet()
-            if (n > 400) return@launch
+            if (n > 1500) return@launch
             var subdirs: List<String> = emptyList()
             sem.withPermit {
                 val items = try {
