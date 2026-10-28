@@ -125,6 +125,82 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
         super.onDestroy()
     }
 
+    /**
+     * 搜索链路（速度优先）：①索引内存过滤（<10ms，最常见路径）
+     * ②服务端语义搜索（索引缺失/过期时，Readingo 同款）
+     * ③本地递归兜底。全部结果按匹配度由高到低排序
+     * 精确=子序列（可缺字漏字有间隔，不能错字乱序）；模糊=≥50%字符命中
+     */
+    private fun doSearch(allDrives: Boolean = false) {
+        if (!BaiduPanHelp.hasToken()) return
+        val kw = binding.etSearch.text?.toString()?.trim() ?: ""
+        binding.refreshProgressBar.isAutoLoading = true
+        lifecycleScope.launch {
+            try {
+                if (kw.isEmpty()) {
+                    val list = BaiduPanHelp.list(currentDir)
+                    adapter.setItems(list)
+                    binding.tvBreadcrumb.text = currentDir
+                    return@launch
+                }
+                val fuzzy = binding.switchFuzzy.isChecked
+                val lowerKw = kw.lowercase()
+                var results: List<CloudFile>? = null
+                var scopeText = ""
+
+                // ①索引内存过滤（最瞬时；长按强制跳过走语义）
+                if (!allDrives && CloudIndexManager.index != null) {
+                    results = CloudIndexManager.search(lowerKw, fuzzy).map { it.toCloudFile() }
+                    scopeText = if (CloudIndexManager.isFresh()) "全盘（索引）" else "全盘（索引·稍旧）"
+                    CloudIndexManager.ensureFresh()
+                }
+
+                // ②服务端语义搜索（Readingo 同款；精确模式对结果按子序列规则精筛）
+                if (results == null && !allDrives) {
+                    try {
+                        val semantic = BaiduPanHelp.unisearch(kw)
+                        val filtered = if (fuzzy) semantic else semantic.filter {
+                            BaiduPanHelp.subsequenceMatch(it.name.lowercase(), lowerKw)
+                        }
+                        if (filtered.isNotEmpty()) {
+                            results = filtered
+                            scopeText = if (fuzzy) "语义搜索" else "语义搜索·精筛"
+                        }
+                    } catch (e: Exception) {
+                        // 语义搜索不可用，走本地递归
+                    }
+                }
+
+                // ③本地递归兜底
+                if (results == null) {
+                    val start = if (allDrives) "/" else currentDir
+                    results = BaiduPanHelp.searchAll(start, lowerKw, fuzzy) { scanned, _ ->
+                        binding.tvBreadcrumb.text = "搜索中…已扫描 $scanned 个文件夹"
+                    }
+                    scopeText = if (allDrives) "全盘" else "当前目录（含子文件夹）"
+                    if (allDrives) {
+                        val all = BaiduPanHelp.collectAll("/")
+                        CloudIndexManager.saveFrom(all)
+                    }
+                    CloudIndexManager.ensureFresh()
+                }
+
+                // 统一按匹配度由高到低排序
+                results = results.sortedByDescending {
+                    BaiduPanHelp.matchScore(it.name.lowercase(), lowerKw, fuzzy)
+                }
+                adapter.setItems(results)
+                val mode = if (fuzzy) "模糊" else ""
+                binding.tvBreadcrumb.text =
+                    "${scopeText}${mode}搜索「$kw」：${results.size} 个结果"
+            } catch (e: Exception) {
+                toastOnUi(e.message ?: "搜索失败")
+            } finally {
+                binding.refreshProgressBar.isAutoLoading = false
+            }
+        }
+    }
+
     private fun upAuthState() {
         val hasToken = BaiduPanHelp.hasToken()
         binding.authLayout.visibility = if (hasToken) View.GONE else View.VISIBLE
@@ -153,104 +229,6 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
         if (currentDir == "/") return
         currentDir = currentDir.substringBeforeLast('/').ifEmpty { "/" }
         refresh()
-    }
-
-    /**
-     * 匹配器工厂：
-     * 精确=子序列（搜索词各字符按序出现，可缺字漏字有间隔，不能错字乱序）
-     * 模糊=搜索词中≥50%字符命中（不要求顺序）
-     */
-    private fun makeMatcher(lowerKw: String, fuzzy: Boolean): (String) -> Boolean =
-        if (fuzzy) {
-            { name ->
-                var hit = 0
-                for (c in lowerKw) {
-                    if (name.contains(c)) hit++
-                }
-                hit * 2 >= lowerKw.length
-            }
-        } else {
-            { name -> BaiduPanHelp.subsequenceMatch(name, lowerKw) }
-        }
-
-    /**
-     * 搜索链路：①服务端语义搜索（瞬时；精确模式对其结果做子序列精筛）
-     * ②索引内存过滤 ③递归当前目录；长按=跳过语义直接本地全盘
-     */
-    private fun doSearch(allDrives: Boolean = false) {
-        if (!BaiduPanHelp.hasToken()) return
-        val kw = binding.etSearch.text?.toString()?.trim() ?: ""
-        binding.refreshProgressBar.isAutoLoading = true
-        lifecycleScope.launch {
-            try {
-                if (kw.isEmpty()) {
-                    val list = BaiduPanHelp.list(currentDir)
-                    adapter.setItems(list)
-                    binding.tvBreadcrumb.text = currentDir
-                    return@launch
-                }
-                val fuzzy = binding.switchFuzzy.isChecked
-                val lowerKw = kw.lowercase()
-                val matcher = makeMatcher(lowerKw, fuzzy)
-                var results: List<CloudFile>? = null
-                var scopeText = ""
-
-                // ①服务端语义搜索（Readingo 同款，瞬时）
-                if (!allDrives) {
-                    try {
-                        val semantic = BaiduPanHelp.unisearch(kw)
-                        if (semantic.isNotEmpty()) {
-                            // 精确模式：语义召回后按子序列规则精筛，保证不多字不错字
-                            val filtered = if (fuzzy) semantic else semantic.filter {
-                                BaiduPanHelp.subsequenceMatch(it.name.lowercase(), lowerKw)
-                            }
-                            if (filtered.isNotEmpty()) {
-                                results = filtered
-                                scopeText = if (fuzzy) "语义搜索" else "语义搜索·精筛"
-                            }
-                        }
-                    } catch (e: Exception) {
-                        // 语义搜索不可用，走本地链路
-                    }
-                }
-
-                // ②索引内存过滤（瞬时）
-                if (results == null && CloudIndexManager.isFresh()) {
-                    results = CloudIndexManager.search(matcher).map { it.toCloudFile() }
-                    scopeText = "全盘（索引）"
-                    CloudIndexManager.ensureFresh()
-                }
-
-                // ③本地递归：无语义结果且无索引时，递归当前目录；长按则全盘
-                if (results == null) {
-                    if (allDrives || CloudIndexManager.index == null) {
-                        val start = if (allDrives) "/" else currentDir
-                        results = BaiduPanHelp.searchAll(start, matcher) { scanned, _ ->
-                            binding.tvBreadcrumb.text = "搜索中…已扫描 $scanned 个文件夹"
-                        }
-                        scopeText = if (allDrives) "全盘" else "当前目录（含子文件夹）"
-                        if (allDrives) {
-                            val all = BaiduPanHelp.collectAll("/")
-                            CloudIndexManager.saveFrom(all)
-                        }
-                    } else {
-                        // 有旧索引但已过期：用旧索引先答，同时后台刷新
-                        results = CloudIndexManager.search(matcher).map { it.toCloudFile() }
-                        scopeText = "全盘（索引·稍旧）"
-                        CloudIndexManager.ensureFresh()
-                    }
-                }
-
-                adapter.setItems(results ?: emptyList())
-                val mode = if (fuzzy) "模糊" else ""
-                binding.tvBreadcrumb.text =
-                    "${scopeText}${mode}搜索「$kw」：${results?.size ?: 0} 个结果"
-            } catch (e: Exception) {
-                toastOnUi(e.message ?: "搜索失败")
-            } finally {
-                binding.refreshProgressBar.isAutoLoading = false
-            }
-        }
     }
 
     /**
