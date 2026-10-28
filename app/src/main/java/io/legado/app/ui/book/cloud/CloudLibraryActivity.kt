@@ -101,6 +101,7 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
             }
         }
         CloudDownloadManager.onUpdate = { showDownloadState() }
+        CloudIndexManager.onUpdate = { showIndexHint() }
         CloudIndexManager.ensureFresh()
         binding.btnAuth.setOnClickListener {
             authLauncher.launch(Intent(this, CloudAuthActivity::class.java))
@@ -153,6 +154,23 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
                     results = CloudIndexManager.search(lowerKw, fuzzy).map { it.toCloudFile() }
                     scopeText = if (CloudIndexManager.isFresh()) "全盘（索引）" else "全盘（索引·稍旧）"
                     CloudIndexManager.ensureFresh()
+                    // 索引稍旧（可能没扫到最新文件）：合并语义搜索结果补充覆盖
+                    if (!CloudIndexManager.isFresh()) {
+                        try {
+                            val semantic = BaiduPanHelp.unisearch(kw)
+                            val have = results.map { it.fsId }.toHashSet()
+                            val add = semantic.filter { s ->
+                                s.fsId !in have && if (fuzzy) true
+                                else BaiduPanHelp.subsequenceMatch(s.name.lowercase(), lowerKw)
+                            }
+                            if (add.isNotEmpty()) {
+                                results = results + add
+                                scopeText = "索引+语义"
+                            }
+                        } catch (e: Exception) {
+                            // 语义补充失败不影响索引结果
+                        }
+                    }
                 }
 
                 // ①.5 索引无结果时语义搜索补位（索引可能缺新文件或超上限）
@@ -307,6 +325,17 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
             }
         } catch (e: Exception) {
             toastOnUi("请先在 设置→其他→书籍保存位置 中设置文件夹")
+        }
+    }
+
+    /**
+     * 索引状态提示：重建中显示进度，不影响浏览与搜索
+     */
+    private fun showIndexHint() {
+        if (CloudIndexManager.isBuilding() &&
+            binding.tvBreadcrumb.text.toString() == currentDir
+        ) {
+            binding.tvBreadcrumb.text = CloudIndexManager.progressText()
         }
     }
 
