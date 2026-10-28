@@ -1,5 +1,6 @@
 package io.legado.app.help.cloud
 
+import android.widget.Toast
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -38,6 +39,14 @@ object CloudIndexManager {
     var indexTime: Long = 0L
         private set
     var onUpdate: (() -> Unit)? = null
+
+    /** 重建进度（已扫描目录数） */
+    var scanned: Int = 0
+        private set
+    var lastError: String? = null
+        private set
+
+    fun progressText(): String = "索引更新中…已扫描 $scanned 个文件夹"
 
     init {
         load()
@@ -113,19 +122,25 @@ object CloudIndexManager {
     fun rebuild() {
         if (building) return
         building = true
+        scanned = 0
+        lastError = null
         notifyUpdate(true)
         scope.launch {
             try {
                 val list = withContext(Dispatchers.IO) {
-                    BaiduPanHelp.collectAll("/") { _, _ ->
+                    BaiduPanHelp.collectAll("/") { s, _ ->
+                        scanned = s
                         notifyUpdate()
                     }
                 }
                 index = list.map { Entry(it.path, it.name, it.isDir, it.size, it.fsId) }
                 indexTime = System.currentTimeMillis()
                 withContext(Dispatchers.IO) { save() }
+                Toast.makeText(appCtx, "网盘索引已就绪（${index?.size ?: 0} 项）", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
-                // 保留旧索引
+                // 保留旧索引，但把失败显式告知
+                lastError = e.message ?: "未知错误"
+                Toast.makeText(appCtx, "索引更新失败：$lastError", Toast.LENGTH_LONG).show()
             } finally {
                 building = false
                 notifyUpdate(true)
