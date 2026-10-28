@@ -8,7 +8,6 @@ import io.legado.app.base.adapter.DiffRecyclerAdapter
 import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.databinding.ItemCloudFileBinding
 import io.legado.app.help.cloud.BaiduPanHelp.CloudFile
-import io.legado.app.lib.theme.primaryColor
 
 class CloudFileAdapter(
     context: Context,
@@ -47,7 +46,6 @@ class CloudFileAdapter(
                 else -> "${item.size} B"
             }
         }
-        ivIcon.setColorFilter(root.context.primaryColor)
         tvName.text = item.name
     }
 
