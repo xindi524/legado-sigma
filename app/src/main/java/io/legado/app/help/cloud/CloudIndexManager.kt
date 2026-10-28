@@ -134,22 +134,12 @@ object CloudIndexManager {
     }
 
     /**
-     * 用索引做全盘过滤（内存瞬时完成）
+     * 用索引做全盘过滤（内存瞬时完成），匹配逻辑由调用方传入
      */
-    fun search(keyword: String, fuzzy: Boolean): List<Entry> {
-        val kw = keyword.lowercase()
+    fun search(matcher: (String) -> Boolean): List<Entry> {
         val all = index ?: return emptyList()
         return all.filter { e ->
-            val name = e.name.lowercase()
-            if (fuzzy) {
-                var hit = 0
-                for (c in kw) {
-                    if (name.contains(c)) hit++
-                }
-                hit * 2 >= kw.length
-            } else {
-                name.contains(kw)
-            }
+            matcher(e.name.lowercase())
         }.sortedWith(
             compareByDescending<Entry> { it.isDir }.thenBy { it.name }
         )
