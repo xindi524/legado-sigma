@@ -156,9 +156,26 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
     }
 
     /**
-     * 搜索链路：①服务端语义搜索（瞬时）②索引内存过滤 ③递归当前目录
-     * 长按搜索按钮跳过语义搜索直接本地全盘扫描
-     * 精确=包含完整搜索词，模糊=搜索词中≥50%字符命中
+     * 匹配器工厂：
+     * 精确=子序列（搜索词各字符按序出现，可缺字漏字有间隔，不能错字乱序）
+     * 模糊=搜索词中≥50%字符命中（不要求顺序）
+     */
+    private fun makeMatcher(lowerKw: String, fuzzy: Boolean): (String) -> Boolean =
+        if (fuzzy) {
+            { name ->
+                var hit = 0
+                for (c in lowerKw) {
+                    if (name.contains(c)) hit++
+                }
+                hit * 2 >= lowerKw.length
+            }
+        } else {
+            { name -> BaiduPanHelp.subsequenceMatch(name, lowerKw) }
+        }
+
+    /**
+     * 搜索链路：①服务端语义搜索（瞬时；精确模式对其结果做子序列精筛）
+     * ②索引内存过滤 ③递归当前目录；长按=跳过语义直接本地全盘
      */
     private fun doSearch(allDrives: Boolean = false) {
         if (!BaiduPanHelp.hasToken()) return
@@ -174,25 +191,32 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
                 }
                 val fuzzy = binding.switchFuzzy.isChecked
                 val lowerKw = kw.lowercase()
+                val matcher = makeMatcher(lowerKw, fuzzy)
                 var results: List<CloudFile>? = null
                 var scopeText = ""
 
-                // ①服务端语义搜索（短按且非强制本地时）
+                // ①服务端语义搜索（Readingo 同款，瞬时）
                 if (!allDrives) {
                     try {
                         val semantic = BaiduPanHelp.unisearch(kw)
                         if (semantic.isNotEmpty()) {
-                            results = semantic
-                            scopeText = "语义搜索"
+                            // 精确模式：语义召回后按子序列规则精筛，保证不多字不错字
+                            val filtered = if (fuzzy) semantic else semantic.filter {
+                                BaiduPanHelp.subsequenceMatch(it.name.lowercase(), lowerKw)
+                            }
+                            if (filtered.isNotEmpty()) {
+                                results = filtered
+                                scopeText = if (fuzzy) "语义搜索" else "语义搜索·精筛"
+                            }
                         }
                     } catch (e: Exception) {
                         // 语义搜索不可用，走本地链路
                     }
                 }
 
-                // ②索引内存过滤
+                // ②索引内存过滤（瞬时）
                 if (results == null && CloudIndexManager.isFresh()) {
-                    results = CloudIndexManager.search(kw, fuzzy).map { it.toCloudFile() }
+                    results = CloudIndexManager.search(matcher).map { it.toCloudFile() }
                     scopeText = "全盘（索引）"
                     CloudIndexManager.ensureFresh()
                 }
@@ -201,7 +225,7 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
                 if (results == null) {
                     if (allDrives || CloudIndexManager.index == null) {
                         val start = if (allDrives) "/" else currentDir
-                        results = BaiduPanHelp.searchAll(kw, fuzzy, startDir = start) { scanned, _ ->
+                        results = BaiduPanHelp.searchAll(start, matcher) { scanned, _ ->
                             binding.tvBreadcrumb.text = "搜索中…已扫描 $scanned 个文件夹"
                         }
                         scopeText = if (allDrives) "全盘" else "当前目录（含子文件夹）"
@@ -211,15 +235,12 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
                         }
                     } else {
                         // 有旧索引但已过期：用旧索引先答，同时后台刷新
-                        results = CloudIndexManager.search(kw, fuzzy).map { it.toCloudFile() }
+                        results = CloudIndexManager.search(matcher).map { it.toCloudFile() }
                         scopeText = "全盘（索引·稍旧）"
                         CloudIndexManager.ensureFresh()
                     }
                 }
 
-                results = results?.let { r ->
-                    if (r.isEmpty()) filterList(BaiduPanHelp.list(currentDir), lowerKw, fuzzy) else r
-                }
                 adapter.setItems(results ?: emptyList())
                 val mode = if (fuzzy) "模糊" else ""
                 binding.tvBreadcrumb.text =
@@ -229,75 +250,6 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
             } finally {
                 binding.refreshProgressBar.isAutoLoading = false
             }
-        }
-    }
-
-    private fun filterList(
-        list: List<CloudFile>,
-        lowerKw: String,
-        fuzzy: Boolean
-    ): List<CloudFile> = list.filter { f ->
-        val name = f.name.lowercase()
-        if (fuzzy) {
-            var hit = 0
-            for (c in lowerKw) {
-                if (name.contains(c)) hit++
-            }
-            hit * 2 >= lowerKw.length
-        } else {
-            name.contains(lowerKw)
-        }
-    }.sortedWith(
-        compareByDescending<CloudFile> { it.isDir }.thenBy { it.name }
-    )
-
-    /**
-     * 索引状态提示（预留）
-     */
-    private fun showIndexHint() = Unit
-
-    override fun onFileClick(file: CloudFile) {
-        if (file.isDir) {
-            binding.etSearch.setText("")
-            currentDir = file.path
-            refresh()
-            return
-        }
-        if (!file.name.endsWith(".txt", true) && !file.name.endsWith(".epub", true)) {
-            toastOnUi("仅支持导入 TXT / EPUB 文件")
-            return
-        }
-        // 未设置书籍保存位置：仿导入本地书籍的设计弹窗引导授权
-        if (AppConfig.defaultBookTreeUri.isNullOrBlank()) {
-            pendingFile = file
-            alertSelectBookFolder()
-            return
-        }
-        // 书籍保存位置已有同名同大小文件：跳过下载直接导入
-        val existing = findInBookStore(file.name, file.size)
-        if (existing != null) {
-            alert("导入已有文件") {
-                setMessage("「${file.name}」已在书籍保存位置，直接加入书架？")
-                positiveButton("导入") {
-                    importExisting(existing)
-                }
-                negativeButton("取消")
-            }
-            return
-        }
-        if (CloudDownloadManager.task?.state == CloudDownloadManager.State.RUNNING) {
-            toastOnUi("已有文件在下载中，请先暂停或等待完成")
-            return
-        }
-        alert("下载并导入") {
-            setMessage(
-                "「${file.name}」（${formatSize(file.size)}）\n\n" +
-                    "将保存到「书籍保存位置」设定的文件夹（设置→其他可修改），网盘原件不受影响。"
-            )
-            positiveButton("下载") {
-                CloudDownloadManager.start(file)
-            }
-            negativeButton("取消")
         }
     }
 
