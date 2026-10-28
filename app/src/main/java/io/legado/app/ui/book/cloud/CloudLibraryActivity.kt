@@ -155,7 +155,23 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
                     CloudIndexManager.ensureFresh()
                 }
 
-                // ②服务端语义搜索（Readingo 同款；精确模式对结果按子序列规则精筛）
+                // ①.5 索引无结果时语义搜索补位（索引可能缺新文件或超上限）
+                if (results != null && results.isEmpty() && !allDrives) {
+                    try {
+                        val semantic = BaiduPanHelp.unisearch(kw)
+                        val filtered = if (fuzzy) semantic else semantic.filter {
+                            BaiduPanHelp.subsequenceMatch(it.name.lowercase(), lowerKw)
+                        }
+                        if (filtered.isNotEmpty()) {
+                            results = filtered
+                            scopeText = "语义搜索补位"
+                        }
+                    } catch (e: Exception) {
+                        // 语义搜索不可用
+                    }
+                }
+
+                // ②服务端语义搜索（索引完全缺失时；精确模式按子序列规则精筛）
                 if (results == null && !allDrives) {
                     try {
                         val semantic = BaiduPanHelp.unisearch(kw)
