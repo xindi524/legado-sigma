@@ -201,6 +201,51 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
         }
     }
 
+    override fun onFileClick(file: CloudFile) {
+        if (file.isDir) {
+            binding.etSearch.setText("")
+            currentDir = file.path
+            refresh()
+            return
+        }
+        if (!file.name.endsWith(".txt", true) && !file.name.endsWith(".epub", true)) {
+            toastOnUi("仅支持导入 TXT / EPUB 文件")
+            return
+        }
+        // 未设置书籍保存位置：仿导入本地书籍的设计弹窗引导授权
+        if (AppConfig.defaultBookTreeUri.isNullOrBlank()) {
+            pendingFile = file
+            alertSelectBookFolder()
+            return
+        }
+        // 书籍保存位置已有同名同大小文件：跳过下载直接导入
+        val existing = findInBookStore(file.name, file.size)
+        if (existing != null) {
+            alert("导入已有文件") {
+                setMessage("「${file.name}」已在书籍保存位置，直接加入书架？")
+                positiveButton("导入") {
+                    importExisting(existing)
+                }
+                negativeButton("取消")
+            }
+            return
+        }
+        if (CloudDownloadManager.task?.state == CloudDownloadManager.State.RUNNING) {
+            toastOnUi("已有文件在下载中，请先暂停或等待完成")
+            return
+        }
+        alert("下载并导入") {
+            setMessage(
+                "「${file.name}」（${formatSize(file.size)}）\n\n" +
+                    "将保存到「书籍保存位置」设定的文件夹（设置→其他可修改），网盘原件不受影响。"
+            )
+            positiveButton("下载") {
+                CloudDownloadManager.start(file)
+            }
+            negativeButton("取消")
+        }
+    }
+
     private fun upAuthState() {
         val hasToken = BaiduPanHelp.hasToken()
         binding.authLayout.visibility = if (hasToken) View.GONE else View.VISIBLE
