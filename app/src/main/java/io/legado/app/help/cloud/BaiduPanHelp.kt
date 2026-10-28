@@ -271,22 +271,54 @@ object BaiduPanHelp {
     }
 
     /**
-     * 递归搜索目录树（默认从根目录全盘），匹配逻辑由调用方传入
+     * 匹配度打分（用于过滤与排序，分数越高越相关）：
+     * 文件名包含完整搜索词：2000 - 首次出现位置（越早越高）
+     * 子序列匹配（可缺字漏字有间隔，不能错字乱序）：1000 - 间隔总和*5
+     * 模糊（仅 fuzzy 开）：搜索词中≥50%字符命中：500 + 命中字数
+     * 不匹配：-1
+     */
+    fun matchScore(lowerName: String, lowerKw: String, fuzzy: Boolean): Int {
+        if (lowerKw.isEmpty()) return 0
+        val idx = lowerName.indexOf(lowerKw)
+        if (idx >= 0) return 2000 - idx
+        var i = 0
+        var lastIdx = -1
+        var gap = 0
+        for ((k, c) in lowerName.withIndex()) {
+            if (i < lowerKw.length && c == lowerKw[i]) {
+                if (lastIdx >= 0) gap += k - lastIdx - 1
+                lastIdx = k
+                i++
+            }
+        }
+        if (i == lowerKw.length) return 1000 - gap * 5
+        if (fuzzy) {
+            var hit = 0
+            for (c in lowerKw) {
+                if (lowerName.contains(c)) hit++
+            }
+            if (hit * 2 >= lowerKw.length) return 500 + hit
+        }
+        return -1
+    }
+
+    /**
+     * 递归搜索目录树（默认从根目录全盘），按匹配度打分过滤并排序
      */
     suspend fun searchAll(
         startDir: String,
-        matcher: (String) -> Boolean,
+        lowerKw: String,
+        fuzzy: Boolean,
         onProgress: (scanned: Int, found: Int) -> Unit = { _, _ -> }
     ): List<CloudFile> {
-        val matched = ArrayList<CloudFile>()
+        val matched = ArrayList<Pair<Int, CloudFile>>()
         for (f in collectAll(startDir) { s, _ ->
             onProgress(s, matched.size)
         }) {
-            if (matcher(f.name.lowercase())) matched.add(f)
+            val score = matchScore(f.name.lowercase(), lowerKw, fuzzy)
+            if (score >= 0) matched.add(score to f)
         }
-        return matched.sortedWith(
-            compareByDescending<CloudFile> { it.isDir }.thenBy { it.name }
-        )
+        return matched.sortedByDescending { it.first }.map { it.second }
     }
 
     /**
