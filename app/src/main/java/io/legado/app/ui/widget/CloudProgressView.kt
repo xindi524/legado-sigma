@@ -56,8 +56,8 @@ class CloudProgressView @JvmOverloads constructor(
         val cy = height / 2f
         val stroke = width * 0.10f
         val radius = width / 2f - stroke
-        val themeColor = primaryColor
-        val secColor = secondaryTextColor
+        val themeColor = context.primaryColor
+        val secColor = context.secondaryTextColor
 
         // 背景圆环
         ringPaint.strokeWidth = stroke
