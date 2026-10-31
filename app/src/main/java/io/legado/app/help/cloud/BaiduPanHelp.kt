@@ -261,11 +261,32 @@ object BaiduPanHelp {
                 )
             )
         }
-        // 文件夹在前，名称按中文拼音排序（与系统文件管理器一致）
+        // 文件夹在前，名称按自然排序（数字段按数值比，其余中文拼音），与主流文件管理器一致
         val collator = java.text.Collator.getInstance(java.util.Locale.CHINA)
+        fun natural(a: String, b: String): Int {
+            var ia = 0; var ib = 0
+            while (ia < a.length && ib < b.length) {
+                val ca = a[ia]; val cb = b[ib]
+                if (ca.isDigit() && cb.isDigit()) {
+                    var ja = ia; while (ja < a.length && a[ja].isDigit()) ja++
+                    var jb = ib; while (jb < b.length && b[jb].isDigit()) jb++
+                    val na = a.substring(ia, ja).trimStart('0').toLongOrNull() ?: Long.MAX_VALUE
+                    val nb = b.substring(ib, jb).trimStart('0').toLongOrNull() ?: Long.MAX_VALUE
+                    if (na != nb) return if (na < nb) -1 else 1
+                    ia = ja; ib = jb
+                } else if (ca != cb) {
+                    return collator.compare(a.substring(ia), b.substring(ib))
+                } else { ia++; ib++ }
+            }
+            return when {
+                ia >= a.length && ib >= b.length -> 0
+                ia >= a.length -> -1
+                else -> 1
+            }
+        }
         return result.sortedWith(
             compareByDescending<CloudFile> { it.isDir }
-                .thenComparator { a, b -> collator.compare(a.name, b.name) }
+                .thenComparator { a, b -> natural(a.name, b.name) }
         )
     }
 
