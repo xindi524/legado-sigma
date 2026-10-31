@@ -20,7 +20,10 @@ import io.legado.app.help.cloud.BaiduPanHelp.CloudFile
 import io.legado.app.help.cloud.CloudDownloadManager
 import io.legado.app.help.cloud.CloudIndexManager
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.storage.Backup
+import io.legado.app.help.storage.Restore
 import io.legado.app.lib.dialogs.alert
+import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.ui.file.HandleFileContract
@@ -407,6 +410,8 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
     override fun onMenuItemClick(item: MenuItem?): Boolean {
         when (item?.itemId) {
             R.id.menu_refresh -> refresh()
+            R.id.menu_baidu_backup -> baiduBackup()
+            R.id.menu_baidu_restore -> baiduRestore()
             R.id.menu_logout -> {
                 BaiduPanHelp.clearToken()
                 upAuthState()
@@ -414,6 +419,79 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
             }
         }
         return false
+    }
+
+    /**
+     * 生成完整备份 ZIP 并上传到网盘 /apps/开源阅读D/backup/
+     */
+    private fun baiduBackup() {
+        lifecycleScope.launch {
+            try {
+                binding.refreshProgressBar.isAutoLoading = true
+                withContext(Dispatchers.IO) {
+                    Backup.backupLocked(this@CloudLibraryActivity, null)
+                }
+                val dir = appCtx.getExternalFilesDir(null)!!
+                val zip = dir.listFiles { f -> f.name.startsWith("backup") && f.name.endsWith(".zip") }
+                    ?.maxByOrNull { it.lastModified() }
+                    ?: throw Exception("未找到备份文件")
+                val remotePath = "/apps/开源阅读D/backup/${zip.name}"
+                withContext(Dispatchers.IO) {
+                    BaiduPanHelp.uploadFile(zip, remotePath)
+                }
+                toastOnUi("已备份到网盘：${zip.name}")
+            } catch (e: Exception) {
+                toastOnUi("备份失败：${e.message}")
+            } finally {
+                binding.refreshProgressBar.isAutoLoading = false
+            }
+        }
+    }
+
+    /**
+     * 从网盘 /apps/开源阅读D/backup/ 选择备份 ZIP 下载并恢复
+     */
+    private fun baiduRestore() {
+        lifecycleScope.launch {
+            try {
+                binding.refreshProgressBar.isAutoLoading = true
+                val files = withContext(Dispatchers.IO) {
+                    BaiduPanHelp.list("/apps/开源阅读D/backup")
+                }.filter { !it.isDir && it.name.endsWith(".zip") }
+                    .sortedByDescending { it.name }
+                binding.refreshProgressBar.isAutoLoading = false
+                if (files.isEmpty()) {
+                    toastOnUi("网盘中没有备份文件")
+                    return@launch
+                }
+                selector("选择要恢复的备份", files.map { it.name }.toTypedArray()) { _, i ->
+                    val sel = files[i]
+                    lifecycleScope.launch {
+                        try {
+                            binding.refreshProgressBar.isAutoLoading = true
+                            val tmp = File(appCtx.cacheDir, "restore_${sel.name}")
+                            withContext(Dispatchers.IO) {
+                                tmp.outputStream().use { out ->
+                                    BaiduPanHelp.downloadTo(sel.fsId, out)
+                                }
+                            }
+                            withContext(Dispatchers.IO) {
+                                Restore.restore(this@CloudLibraryActivity, Uri.fromFile(tmp))
+                            }
+                            tmp.delete()
+                            toastOnUi("已从网盘恢复：${sel.name}\n建议重启应用使配置完全生效")
+                        } catch (e: Exception) {
+                            toastOnUi("恢复失败：${e.message}")
+                        } finally {
+                            binding.refreshProgressBar.isAutoLoading = false
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                toastOnUi(e.message ?: "获取备份列表失败")
+                binding.refreshProgressBar.isAutoLoading = false
+            }
+        }
     }
 
 }
