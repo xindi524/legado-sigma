@@ -38,7 +38,7 @@ object BaiduPanHelp {
         "https://openapi.baidu.com/oauth/2.0/authorize?response_type=token" +
                 "&client_id=$CLIENT_ID" +
                 "&redirect_uri=http://openapi.baidu.com/oauth/2.0/login_success" +
-                "&scope=basic,netdisk&display=mobile&force_login=1"
+                "&scope=basic,netdisk&display=mobile"
     private const val PAN_HOST = "https://pan.baidu.com"
     private const val DOWNLOAD_UA = "pan.baidu.com"
     private const val PREF = "cloud_baidu"
@@ -145,6 +145,10 @@ object BaiduPanHelp {
         if (exp <= System.currentTimeMillis()) return
         saveAccounts(listOf(Account("legacy", "默认账号", legacy, exp)))
         setActive("legacy")
+    }
+
+    init {
+        migrateLegacy()
     }
 
     fun hasToken(): Boolean = currentToken() != null
