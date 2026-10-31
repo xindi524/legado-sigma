@@ -34,6 +34,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import splitties.init.appCtx
+import java.io.File
 
 /**
  * F5：云端书库——百度网盘目录浏览、下载并导入书架
@@ -171,7 +172,7 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
                                 else BaiduPanHelp.subsequenceMatch(s.name.lowercase(), lowerKw)
                             }
                             if (add.isNotEmpty()) {
-                                results = results + add
+                                results = (results ?: emptyList()) + add
                                 scopeText = "索引+语义"
                             }
                         } catch (e: Exception) {
@@ -440,11 +441,11 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
     private fun showAccountSelector() {
         val accs = BaiduPanHelp.accounts()
         val active = BaiduPanHelp.activeAccount()
-        val items = ArrayList<String>()
+        val items = ArrayList<CharSequence>()
         accs.forEach { items.add(if (it.id == active?.id) "● ${it.name}" else it.name) }
         items.add("＋ 添加新账号")
         if (accs.size > 1 && active != null) items.add("－ 移除当前账号")
-        selector("百度网盘账号", items.toTypedArray()) { _, i ->
+        selector("百度网盘账号", items) { _, i ->
             when {
                 i < accs.size -> {
                     if (accs[i].id == active?.id) return@selector
@@ -524,7 +525,7 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
                     toastOnUi("网盘中没有备份文件")
                     return@launch
                 }
-                selector("选择要恢复的备份", files.map { it.name }.toTypedArray()) { _, i ->
+                selector("选择要恢复的备份", files.map { it.name as CharSequence }) { _, i ->
                     val sel = files[i]
                     lifecycleScope.launch {
                         try {
