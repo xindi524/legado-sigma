@@ -7,12 +7,14 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.addCallback
+import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.base.BaseActivity
 import io.legado.app.databinding.ActivityCloudAuthBinding
 import io.legado.app.help.cloud.BaiduPanHelp
 import io.legado.app.lib.theme.primaryColor
 import io.legado.app.utils.viewbindingdelegate.viewBinding
+import kotlinx.coroutines.launch
 
 /**
  * F5：百度网盘 OAuth 授权（implicit 流），拦截 login_success 地址提取 accesstoken
@@ -65,9 +67,24 @@ class CloudAuthActivity : BaseActivity<ActivityCloudAuthBinding>() {
         if (authorized) return
         val token = BaiduPanHelp.extractToken(url) ?: return
         authorized = true
-        BaiduPanHelp.saveToken(token.first, token.second)
-        setResult(RESULT_OK)
-        finish()
+        lifecycleScope.launch {
+            try {
+                // 拉取百度昵称与 uk 入库为独立账号并激活
+                val (name, uk) = BaiduPanHelp.uinfoWithToken(token.first)
+                BaiduPanHelp.addAccount(
+                    name, token.first,
+                    System.currentTimeMillis() + (token.second - 86400) * 1000, uk
+                )
+            } catch (e: Exception) {
+                BaiduPanHelp.addAccount(
+                    "账号${System.currentTimeMillis() % 1000}", token.first,
+                    System.currentTimeMillis() + (token.second - 86400) * 1000,
+                    "u${System.currentTimeMillis()}"
+                )
+            }
+            setResult(RESULT_OK)
+            finish()
+        }
     }
 
 }
