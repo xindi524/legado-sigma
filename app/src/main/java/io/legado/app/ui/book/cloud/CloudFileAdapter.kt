@@ -30,6 +30,9 @@ class CloudFileAdapter(
         return ItemCloudFileBinding.inflate(inflater, parent, false)
     }
 
+    /** 书架内已有书籍的文件名集合（用于标记"已导入"） */
+    var shelfNames: Set<String> = emptySet()
+
     override fun convert(
         holder: ItemViewHolder,
         binding: ItemCloudFileBinding,
@@ -69,6 +72,10 @@ class CloudFileAdapter(
             cvProgress.visibility = android.view.View.GONE
             tvSize.visibility = android.view.View.VISIBLE
             tvName.text = item.name
+        }
+        // 已导入过书架的文件在名称后追加标记
+        if (!item.isDir && item.name in shelfNames) {
+            tvName.text = "${tvName.text}　已导入"
         }
     }
 
