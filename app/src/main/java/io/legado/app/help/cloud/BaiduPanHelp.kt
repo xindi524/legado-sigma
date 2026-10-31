@@ -261,7 +261,12 @@ object BaiduPanHelp {
                 )
             )
         }
-        return result
+        // 文件夹在前，名称按中文拼音排序（与系统文件管理器一致）
+        val collator = java.text.Collator.getInstance(java.util.Locale.CHINA)
+        return result.sortedWith(
+            compareByDescending<CloudFile> { it.isDir }
+                .thenComparator { a, b -> collator.compare(a.name, b.name) }
+        )
     }
 
     /**
