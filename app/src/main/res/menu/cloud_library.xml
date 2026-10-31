@@ -9,6 +9,16 @@
         app:showAsAction="always" />
 
     <item
+        android:id="@+id/menu_baidu_backup"
+        android:title="备份到网盘"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_baidu_restore"
+        android:title="从网盘恢复"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_logout"
         android:title="退出授权"
         app:showAsAction="never" />
