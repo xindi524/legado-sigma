@@ -98,14 +98,6 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
             doSearch(allDrives = true)
             true
         }
-        binding.btnDownloadToggle.setOnClickListener {
-            val t = CloudDownloadManager.task ?: return@setOnClickListener
-            when (t.state) {
-                CloudDownloadManager.State.RUNNING -> CloudDownloadManager.pause()
-                CloudDownloadManager.State.PAUSED -> CloudDownloadManager.resume()
-                else -> CloudDownloadManager.clear()
-            }
-        }
         CloudDownloadManager.onUpdate = { showDownloadState() }
         CloudIndexManager.onUpdate = { showIndexHint() }
         CloudIndexManager.setAccount(BaiduPanHelp.activeAccount()?.id ?: "default")
@@ -245,6 +237,10 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
 
     override fun onFileClick(file: CloudFile) {
         if (file.isDir) {
+            if (file.name == "← 返回上级") {
+                upToParent()
+                return
+            }
             binding.etSearch.setText("")
             currentDir = file.path
             refresh()
@@ -301,7 +297,11 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
         lifecycleScope.launch {
             try {
                 val list = BaiduPanHelp.list(currentDir)
-                adapter.setItems(list)
+                // 非根目录时首项显示返回上级
+                val display = if (currentDir != "/") {
+                    listOf(CloudFile(0, "", "← 返回上级", 0, true)) + list
+                } else list
+                adapter.setItems(display)
                 binding.tvBreadcrumb.text = currentDir
                 uiPrefs.edit().putString("last_dir", currentDir).apply()
             } catch (e: Exception) {
@@ -361,33 +361,20 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
     }
 
     /**
-     * 显示下载任务状态（任务由 CloudDownloadManager 后台执行，不随页面销毁）
+     * 显示下载任务状态：状态条已改为列表项内圆环，此处只刷新列表
      */
     private fun showDownloadState() {
-        val t = CloudDownloadManager.task
-        if (t == null) {
-            binding.downloadBar.visibility = View.GONE
-            return
-        }
-        binding.downloadBar.visibility = View.VISIBLE
-        val pct = if (t.file.size > 0) {
-            (t.downloaded * 100 / t.file.size).toInt().coerceIn(0, 100)
-        } else 0
-        binding.tvDownloadText.text = when (t.state) {
-            CloudDownloadManager.State.RUNNING -> "下载中「${t.file.name}」$pct%"
-            CloudDownloadManager.State.PAUSED -> "已暂停「${t.file.name}」$pct%"
-            CloudDownloadManager.State.DONE -> "已完成「${t.file.name}」"
-            CloudDownloadManager.State.FAILED -> "下载失败「${t.file.name}」"
-        }
-        binding.btnDownloadToggle.text = when (t.state) {
-            CloudDownloadManager.State.RUNNING -> "暂停"
-            CloudDownloadManager.State.PAUSED -> "继续"
-            else -> "清除"
-        }
-        if (t.state == CloudDownloadManager.State.FAILED && t.needReselect) {
-            t.needReselect = false
-            pendingFile = t.file
-            alertSelectBookFolder()
+        adapter.notifyDataSetChanged()
+    }
+
+    override fun currentTask(): CloudDownloadManager.Task? = CloudDownloadManager.task
+
+    override fun toggleTask() {
+        val t = CloudDownloadManager.task ?: return
+        when (t.state) {
+            CloudDownloadManager.State.RUNNING -> CloudDownloadManager.pause()
+            CloudDownloadManager.State.PAUSED -> CloudDownloadManager.resume()
+            else -> CloudDownloadManager.clear()
         }
     }
 
@@ -443,8 +430,11 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
         val active = BaiduPanHelp.activeAccount()
         val items = ArrayList<CharSequence>()
         accs.forEach { items.add(if (it.id == active?.id) "● ${it.name}" else it.name) }
+        val addIdx = accs.size
         items.add("＋ 添加新账号")
-        if (accs.size > 1 && active != null) items.add("－ 移除当前账号")
+        val removeIdx = if (accs.size > 1 && active != null) {
+            items.add("－ 移除当前账号"); accs.size + 1
+        } else -1
         selector("百度网盘账号", items) { _, i ->
             when {
                 i < accs.size -> {
@@ -459,10 +449,10 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
                     refresh()
                     toastOnUi("已切换到：${accs[i].name}")
                 }
-                items[i].startsWith("＋") -> {
+                i == addIdx -> {
                     authLauncher.launch(Intent(this, CloudAuthActivity::class.java))
                 }
-                items[i].startsWith("－") -> {
+                i == removeIdx -> {
                     if (CloudDownloadManager.task?.state == CloudDownloadManager.State.RUNNING) {
                         toastOnUi("有文件正在下载，完成或暂停后再移除账号")
                         return@selector
