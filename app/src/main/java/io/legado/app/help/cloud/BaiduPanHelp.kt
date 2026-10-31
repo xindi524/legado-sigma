@@ -166,10 +166,6 @@ object BaiduPanHelp {
 
     private val prefs get() = appCtx.getSharedPreferences(PREF, 0)
 
-    fun clearToken() {
-        prefs.edit().clear().apply()
-    }
-
 
     /**
      * 从授权完成跳转的 login_success 地址中提取 accesstoken
@@ -218,7 +214,7 @@ object BaiduPanHelp {
      * 创建网盘目录（百度 create 接口会自动创建父目录）
      */
     private suspend fun createDir(path: String): Boolean = withContext(IO) {
-        val token = prefs.getString(KEY_TOKEN, null) ?: return@withContext false
+        val token = currentToken() ?: return@withContext false
         val url = "$PAN_HOST/rest/2.0/xpan/file?method=create&access_token=$token"
         val body = okhttp3.FormBody.Builder()
             .add("path", path)
