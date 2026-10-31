@@ -9,6 +9,11 @@
         app:showAsAction="always" />
 
     <item
+        android:id="@+id/menu_account"
+        android:title="账号"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/menu_baidu_backup"
         android:title="备份到网盘"
         app:showAsAction="never" />
