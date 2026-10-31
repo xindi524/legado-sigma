@@ -8,6 +8,7 @@ import io.legado.app.base.adapter.DiffRecyclerAdapter
 import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.databinding.ItemCloudFileBinding
 import io.legado.app.help.cloud.BaiduPanHelp.CloudFile
+import io.legado.app.help.cloud.CloudDownloadManager
 
 class CloudFileAdapter(
     context: Context,
@@ -35,6 +36,8 @@ class CloudFileAdapter(
         item: CloudFile,
         payloads: MutableList<Any>
     ) = binding.run {
+        val task = callBack.currentTask()
+        val isTaskFile = task?.file?.path == item.path
         if (item.isDir) {
             ivIcon.setImageResource(R.drawable.ic_cfg_backup)
             tvSize.text = "文件夹"
@@ -46,7 +49,27 @@ class CloudFileAdapter(
                 else -> "${item.size} B"
             }
         }
-        tvName.text = item.name
+        if (isTaskFile) {
+            ivIcon.visibility = android.view.View.GONE
+            cvProgress.visibility = android.view.View.VISIBLE
+            val pct = if (task.file.size > 0) {
+                (task.downloaded * 100 / task.file.size).toInt().coerceIn(0, 100)
+            } else 0
+            cvProgress.progress = pct
+            cvProgress.paused = task.state == CloudDownloadManager.State.PAUSED
+            cvProgress.done = task.state == CloudDownloadManager.State.DONE
+            cvProgress.onToggle = { callBack.toggleTask() }
+            tvName.text = when (task.state) {
+                CloudDownloadManager.State.RUNNING -> "${item.name}　下载中"
+                CloudDownloadManager.State.PAUSED -> "${item.name}　已暂停"
+                CloudDownloadManager.State.DONE -> "${item.name}　已完成"
+                CloudDownloadManager.State.FAILED -> "${item.name}　失败"
+            }
+        } else {
+            ivIcon.visibility = android.view.View.VISIBLE
+            cvProgress.visibility = android.view.View.GONE
+            tvName.text = item.name
+        }
     }
 
     override fun registerListener(holder: ItemViewHolder, binding: ItemCloudFileBinding) {
@@ -61,6 +84,8 @@ class CloudFileAdapter(
 
     interface CallBack {
         fun onFileClick(file: CloudFile)
+        fun currentTask(): CloudDownloadManager.Task?
+        fun toggleTask()
     }
 
 }
