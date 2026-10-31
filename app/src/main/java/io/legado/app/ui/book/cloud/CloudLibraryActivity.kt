@@ -237,7 +237,7 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
 
     override fun onFileClick(file: CloudFile) {
         if (file.isDir) {
-            if (file.name == "← 返回上级") {
+            if (file.name == "..") {
                 upToParent()
                 return
             }
@@ -299,7 +299,7 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
                 val list = BaiduPanHelp.list(currentDir)
                 // 非根目录时首项显示返回上级
                 val display = if (currentDir != "/") {
-                    listOf(CloudFile(0, "", "← 返回上级", 0, true)) + list
+                    listOf(CloudFile(0, "", "..", 0, true)) + list
                 } else list
                 adapter.setItems(display)
                 binding.tvBreadcrumb.text = currentDir
@@ -361,10 +361,14 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
     }
 
     /**
-     * 显示下载任务状态：状态条已改为列表项内圆环，此处只刷新列表
+     * 显示下载任务状态：精确刷新列表中任务文件的圆环
      */
     private fun showDownloadState() {
-        adapter.notifyDataSetChanged()
+        val t = CloudDownloadManager.task ?: return
+        val pos = (0 until adapter.itemCount).firstOrNull {
+            adapter.getItem(it)?.path == t.file.path
+        } ?: return
+        adapter.notifyItemChanged(pos, "task")
     }
 
     override fun currentTask(): CloudDownloadManager.Task? = CloudDownloadManager.task
@@ -452,7 +456,10 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
                 i == addIdx -> {
                     toastOnUi("正在打开授权页…")
                     try {
-                        authLauncher.launch(Intent(this, CloudAuthActivity::class.java))
+                        authLauncher.launch(
+                            Intent(this, CloudAuthActivity::class.java)
+                                .putExtra("force_new", true)
+                        )
                     } catch (e: Exception) {
                         toastOnUi("打开授权页失败：${e.message}")
                     }
