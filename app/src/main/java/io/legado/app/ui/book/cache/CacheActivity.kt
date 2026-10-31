@@ -239,7 +239,16 @@ class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>()
     private fun initBookData() {
         booksFlowJob?.cancel()
         booksFlowJob = lifecycleScope.launch {
-            appDb.bookDao.flowByGroup(groupId).map { books ->
+            // 嵌套分组：父分组包含子分组书籍（掩码递归）；默认书架/全部书籍显示所有书
+            val bookFlow = when {
+                groupId == BookGroup.IdRoot || groupId == BookGroup.IdAll ->
+                    appDb.bookDao.flowAll()
+                groupId > 0 -> appDb.bookDao.flowByGroupMask(
+                    BookGroup.computeMask(groupId) { appDb.bookGroupDao.getByParent(it) }
+                )
+                else -> appDb.bookDao.flowByGroup(groupId)
+            }
+            bookFlow.map { books ->
                 val booksDownload = books.filter {
                     !it.isAudio
                 }
