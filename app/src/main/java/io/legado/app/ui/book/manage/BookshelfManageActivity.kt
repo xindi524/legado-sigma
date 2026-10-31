@@ -219,7 +219,16 @@ class BookshelfManageActivity :
         booksFlowJob?.cancel()
         booksFlowJob = lifecycleScope.launch {
             val bookSort = AppConfig.getBookSortByGroupId(viewModel.groupId)
-            appDb.bookDao.flowByGroup(viewModel.groupId).map { list ->
+            // 嵌套分组：父分组包含子分组书籍（掩码递归）；默认书架/全部书籍显示所有书
+            val bookFlow = when {
+                viewModel.groupId == BookGroup.IdRoot || viewModel.groupId == BookGroup.IdAll ->
+                    appDb.bookDao.flowAll()
+                viewModel.groupId > 0 -> appDb.bookDao.flowByGroupMask(
+                    BookGroup.computeMask(viewModel.groupId) { appDb.bookGroupDao.getByParent(it) }
+                )
+                else -> appDb.bookDao.flowByGroup(viewModel.groupId)
+            }
+            bookFlow.map { list ->
                 when (bookSort) {
                     1 -> list.sortedByDescending {
                         it.latestChapterTime
