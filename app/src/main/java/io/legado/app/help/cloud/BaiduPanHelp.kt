@@ -334,6 +334,92 @@ object BaiduPanHelp {
     }
 
     /**
+     * 分片上传本地文件到网盘（rtype=3 覆盖同名；>4MB 自动分片）
+     * errno -10 明确提示空间不足
+     */
+    suspend fun uploadFile(localFile: File, remotePath: String) = withContext(IO) {
+        val token = prefs.getString(KEY_TOKEN, null) ?: throw Exception("百度网盘未授权")
+        val size = localFile.length()
+        val chunk = 4L * 1024 * 1024
+        // 计算每片 md5
+        val md5s = ArrayList<String>()
+        localFile.inputStream().use { input ->
+            val buf = ByteArray(chunk.toInt())
+            val md = java.security.MessageDigest.getInstance("MD5")
+            while (true) {
+                val n = input.read(buf)
+                if (n == -1) break
+                md5s.add(md.digest(buf.copyOf(n)).joinToString("") { "%02x".format(it) })
+            }
+        }
+        // 预上传
+        val pre = apiPostForm(
+            "method=precreate",
+            mapOf(
+                "path" to remotePath, "size" to size.toString(), "isdir" to "0",
+                "block_list" to JSONArray(md5s).toString(),
+                "autoinit" to "1", "rtype" to "3"
+            )
+        )
+        if (pre.optInt("errno", -1) != 0) throw Exception("预上传失败 errno=${pre.optInt("errno")}")
+        val uploadid = pre.optString("uploadid")
+        // 分片上传（multipart）
+        localFile.inputStream().use { input ->
+            val buf = ByteArray(chunk.toInt())
+            var seq = 0
+            while (true) {
+                val n = input.read(buf)
+                if (n == -1) break
+                val boundary = "----legado${System.currentTimeMillis()}$seq"
+                val part = ("--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"blob\"\r\n"
+                        + "Content-Type: application/octet-stream\r\n\r\n").toByteArray()
+                        + buf.copyOf(n) + "\r\n--$boundary--\r\n".toByteArray()
+                val url = "$PAN_HOST/rest/2.0/pcs/superfile2?method=upload&access_token=$token&type=obj" +
+                        "&path=${java.net.URLEncoder.encode(remotePath, "UTF-8")}&uploadid=$uploadid&partseq=$seq"
+                val resp = okHttpClient.newCall(
+                    Request.Builder().url(url)
+                        .header("User-Agent", DOWNLOAD_UA)
+                        .post(part.toRequestBody("multipart/form-data; boundary=$boundary".toMediaTypeOrNull()))
+                        .build()
+                ).await()
+                val j = JSONObject(resp.body?.string() ?: "{}")
+                if (j.optInt("errno", -1) != 0) throw Exception("分片上传失败 errno=${j.optInt("errno")}")
+                seq++
+            }
+        }
+        // 创建文件
+        val now = (System.currentTimeMillis() / 1000).toString()
+        val create = apiPostForm(
+            "method=create",
+            mapOf(
+                "path" to remotePath, "size" to size.toString(), "uploadid" to uploadid,
+                "block_list" to JSONArray(md5s).toString(), "rtype" to "3",
+                "local_mtime" to now, "local_ctime" to now
+            )
+        )
+        val errno = create.optInt("errno", -1)
+        if (errno != 0) {
+            throw Exception(
+                if (errno == -10) "网盘空间不足，请清理后重试"
+                else "上传创建失败 errno=$errno"
+            )
+        }
+    }
+
+    /**
+     * xpan/file 的 form POST（method 放 query，参数放 form）
+     */
+    private suspend fun apiPostForm(method: String, form: Map<String, String>): JSONObject = withContext(IO) {
+        val token = prefs.getString(KEY_TOKEN, null) ?: throw Exception("百度网盘未授权")
+        val body = okhttp3.FormBody.Builder().apply { form.forEach { (k, v) -> add(k, v) } }.build()
+        val request = Request.Builder().url("$PAN_HOST/rest/2.0/xpan/file?$method&access_token=$token")
+            .header("User-Agent", DOWNLOAD_UA)
+            .post(body)
+            .build()
+        JSONObject(okHttpClient.newCall(request).await().body?.string() ?: "{}")
+    }
+
+    /**
      * 获取文件下载直链（返回 info 数组，UA 须为 pan.baidu.com）
      */
     suspend fun getDownloadLink(fsId: Long): String {
