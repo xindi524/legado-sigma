@@ -11,13 +11,27 @@
     android:paddingBottom="12dp"
     android:background="?android:attr/selectableItemBackground">
 
-    <ImageView
-        android:id="@+id/iv_icon"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
-        android:tint="?android:attr/textColorSecondary"
-        android:contentDescription="类型"
-        tools:src="@drawable/ic_cfg_backup" />
+    <FrameLayout
+        android:layout_width="30dp"
+        android:layout_height="30dp">
+
+        <ImageView
+            android:id="@+id/iv_icon"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="center"
+            android:tint="?android:attr/textColorSecondary"
+            android:contentDescription="类型"
+            tools:src="@drawable/ic_cfg_backup" />
+
+        <io.legado.app.ui.widget.CloudProgressView
+            android:id="@+id/cv_progress"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="center"
+            android:visibility="gone" />
+
+    </FrameLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
