@@ -44,6 +44,117 @@ object BaiduPanHelp {
     private const val PREF = "cloud_baidu"
     private const val KEY_TOKEN = "access_token"
     private const val KEY_EXPIRES = "expires_at"
+    private const val KEY_ACCOUNTS = "accounts_json"
+    private const val KEY_ACTIVE = "active_id"
+
+    /**
+     * 多账号支持：账号列表 + 当前激活账号；token 全部经由 currentToken() 获取
+     */
+    class Account(
+        val id: String,
+        val name: String,
+        val token: String,
+        val expiresAt: Long
+    )
+
+    fun accounts(): List<Account> = try {
+        val arr = JSONArray(prefs.getString(KEY_ACCOUNTS, "[]") ?: "[]")
+        (0 until arr.length()).mapNotNull { i ->
+            arr.optJSONObject(i)?.let {
+                Account(it.optString("id"), it.optString("name"), it.optString("token"), it.optLong("exp"))
+            }
+        }
+    } catch (e: Exception) {
+        emptyList()
+    }
+
+    private fun saveAccounts(list: List<Account>) {
+        val arr = JSONArray()
+        list.forEach { a ->
+            arr.put(org.json.JSONObject().put("id", a.id).put("name", a.name)
+                .put("token", a.token).put("exp", a.expiresAt))
+        }
+        prefs.edit().putString(KEY_ACCOUNTS, arr.toString()).apply()
+    }
+
+    fun activeAccount(): Account? {
+        val id = prefs.getString(KEY_ACTIVE, null)
+        val list = accounts()
+        return (id?.let { aid -> list.find { it.id == aid } }) ?: list.firstOrNull()?.also {
+            prefs.edit().putString(KEY_ACTIVE, it.id).apply()
+        }
+    }
+
+    fun setActive(id: String) {
+        prefs.edit().putString(KEY_ACTIVE, id).apply()
+    }
+
+    private fun currentToken(): String? {
+        val a = activeAccount() ?: return null
+        return a.token.takeIf { a.expiresAt > System.currentTimeMillis() }
+    }
+
+    /**
+     * 添加或更新账号（uk 相同视为同一账号），并设为激活；返回是否为新账号
+     */
+    fun addAccount(name: String, token: String, expiresAt: Long, uk: String): Boolean {
+        val list = accounts().toMutableList()
+        val idx = list.indexOfFirst { it.id == uk }
+        val isNew = idx < 0
+        if (isNew) list.add(Account(uk, name, token, expiresAt))
+        else list[idx] = Account(uk, name, token, expiresAt)
+        saveAccounts(list)
+        setActive(uk)
+        return isNew
+    }
+
+    fun removeActive() {
+        val id = activeAccount()?.id
+        val list = accounts().toMutableList()
+        list.removeAll { it.id == id }
+        saveAccounts(list)
+        setActive(list.firstOrNull()?.id ?: "")
+    }
+
+    fun clearToken() {
+        prefs.edit().remove(KEY_ACCOUNTS).remove(KEY_ACTIVE)
+            .remove(KEY_TOKEN).remove(KEY_EXPIRES).apply()
+    }
+
+    /**
+     * 获取账号信息（百度昵称与 uk），token 可显式传入（授权完成时账号尚未入库）
+     */
+    suspend fun uinfoWithToken(token: String): Pair<String, String> = withContext(IO) {
+        val json = JSONObject(
+            okHttpClient.newCall(
+                Request.Builder().url("$PAN_HOST/rest/2.0/xpan/nas?method=uinfo&access_token=$token")
+                    .header("User-Agent", DOWNLOAD_UA)
+                    .build()
+            ).await().body?.string() ?: "{}"
+        )
+        val name = json.optString("baidu_name").ifBlank { "百度账号" }
+        val uk = json.optLong("uk").let { if (it != 0L) it.toString() else "u${System.currentTimeMillis()}" }
+        name to uk
+    }
+
+    private fun migrateLegacy() {
+        if (prefs.getString(KEY_ACCOUNTS, null) != null) return
+        val legacy = prefs.getString(KEY_TOKEN, null) ?: return
+        val exp = prefs.getLong(KEY_EXPIRES, 0L)
+        prefs.edit().remove(KEY_TOKEN).remove(KEY_EXPIRES).apply()
+        if (exp <= System.currentTimeMillis()) return
+        saveAccounts(listOf(Account("legacy", "默认账号", legacy, exp)))
+        setActive("legacy")
+    }
+
+    fun hasToken(): Boolean = currentToken() != null
+
+    fun saveToken(token: String, expiresIn: Long) {
+        prefs.edit()
+            .putString(KEY_TOKEN, token)
+            .putLong(KEY_EXPIRES, System.currentTimeMillis() + (expiresIn - 86400) * 1000)
+            .apply()
+    }
 
     data class CloudFile(
         val fsId: Long,
@@ -55,20 +166,10 @@ object BaiduPanHelp {
 
     private val prefs get() = appCtx.getSharedPreferences(PREF, 0)
 
-    fun hasToken(): Boolean = prefs.getString(KEY_TOKEN, null)?.let { token ->
-        System.currentTimeMillis() < prefs.getLong(KEY_EXPIRES, 0L)
-    } == true
-
     fun clearToken() {
         prefs.edit().clear().apply()
     }
 
-    fun saveToken(token: String, expiresIn: Long) {
-        prefs.edit()
-            .putString(KEY_TOKEN, token)
-            .putLong(KEY_EXPIRES, System.currentTimeMillis() + (expiresIn - 86400) * 1000)
-            .apply()
-    }
 
     /**
      * 从授权完成跳转的 login_success 地址中提取 accesstoken
@@ -91,7 +192,7 @@ object BaiduPanHelp {
     }
 
     private suspend fun apiGet(params: Map<String, String>): JSONObject = withContext(IO) {
-        val token = prefs.getString(KEY_TOKEN, null) ?: throw Exception("百度网盘未授权")
+        val token = currentToken() ?: throw Exception("百度网盘未授权")
         val sb = StringBuilder("$PAN_HOST/rest/2.0/xpan/file?")
         sb.append("access_token=").append(token)
         for ((k, v) in params) {
@@ -189,7 +290,7 @@ object BaiduPanHelp {
      * 响应 data[].list[] 内含 path/size/fsid/filename，可直接用于下载
      */
     suspend fun unisearch(keyword: String): List<CloudFile> = withContext(IO) {
-        val token = prefs.getString(KEY_TOKEN, null) ?: throw Exception("百度网盘未授权")
+        val token = currentToken() ?: throw Exception("百度网盘未授权")
         val query = mapOf(
             "access_token" to token,
             "scene" to "mcpserver",
@@ -338,7 +439,7 @@ object BaiduPanHelp {
      * errno -10 明确提示空间不足
      */
     suspend fun uploadFile(localFile: File, remotePath: String) = withContext(IO) {
-        val token = prefs.getString(KEY_TOKEN, null) ?: throw Exception("百度网盘未授权")
+        val token = currentToken() ?: throw Exception("百度网盘未授权")
         val size = localFile.length()
         val chunk = 4L * 1024 * 1024
         // 计算每片 md5
@@ -410,7 +511,7 @@ object BaiduPanHelp {
      * xpan/file 的 form POST（method 放 query，参数放 form）
      */
     private suspend fun apiPostForm(method: String, form: Map<String, String>): JSONObject = withContext(IO) {
-        val token = prefs.getString(KEY_TOKEN, null) ?: throw Exception("百度网盘未授权")
+        val token = currentToken() ?: throw Exception("百度网盘未授权")
         val body = okhttp3.FormBody.Builder().apply { form.forEach { (k, v) -> add(k, v) } }.build()
         val request = Request.Builder().url("$PAN_HOST/rest/2.0/xpan/file?$method&access_token=$token")
             .header("User-Agent", DOWNLOAD_UA)
@@ -423,7 +524,7 @@ object BaiduPanHelp {
      * 获取文件下载直链（返回 info 数组，UA 须为 pan.baidu.com）
      */
     suspend fun getDownloadLink(fsId: Long): String {
-        val token = prefs.getString(KEY_TOKEN, null) ?: throw Exception("百度网盘未授权")
+        val token = currentToken() ?: throw Exception("百度网盘未授权")
         val json = apiGet(
             mapOf(
                 "method" to "filemetas",
