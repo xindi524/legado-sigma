@@ -41,6 +41,19 @@ data class BookGroup(
         const val IdLocalNone = -5L
         const val IdVideo = -6L
         const val IdError = -11L
+
+        /**
+         * 嵌套分组：计算分组及其所有子孙分组的 group 掩码（用于父分组包含子分组书籍）
+         */
+        fun computeMask(groupId: Long, getChildren: (Long) -> List<BookGroup>): Long {
+            var mask = groupId
+            getChildren(groupId).forEach { child ->
+                if (child.groupId != groupId) {
+                    mask = mask or computeMask(child.groupId, getChildren)
+                }
+            }
+            return mask
+        }
     }
 
     fun getManageName(context: Context): String {
