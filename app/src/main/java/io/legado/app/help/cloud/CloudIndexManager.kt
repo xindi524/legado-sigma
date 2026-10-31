@@ -30,7 +30,8 @@ object CloudIndexManager {
     }
 
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private val cacheFile by lazy { File(appCtx.cacheDir, CACHE_FILE) }
+    private var cacheFile = File(appCtx.cacheDir, CACHE_FILE)
+    private var accountKey = "default"
     private var building = false
     private var lastNotify = 0L
 
@@ -93,6 +94,32 @@ object CloudIndexManager {
         } catch (e: Exception) {
             // 缓存写失败不影响搜索功能
         }
+    }
+
+    /**
+     * 切换账号：加载对应账号的索引缓存
+     */
+    fun setAccount(id: String) {
+        val key = id.ifBlank { "default" }
+        if (key == accountKey && index != null) return
+        accountKey = key
+        index = null
+        indexTime = 0
+        cacheFile = File(appCtx.cacheDir, "cloud_pan_index_$key.json")
+        load()
+    }
+
+    /**
+     * 切换账号：加载对应账号的索引缓存
+     */
+    fun setAccount(id: String) {
+        val key = id.ifBlank { "default" }
+        if (key == accountKey && index != null) return
+        accountKey = key
+        index = null
+        indexTime = 0
+        cacheFile = File(appCtx.cacheDir, "cloud_pan_index_$key.json")
+        load()
     }
 
     fun isFresh(): Boolean =
