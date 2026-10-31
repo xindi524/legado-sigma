@@ -468,9 +468,15 @@ object BaiduPanHelp {
                 val n = input.read(buf)
                 if (n == -1) break
                 val boundary = "----legado${System.currentTimeMillis()}$seq"
-                val part = ("--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"blob\"\r\n"
+                val header = ("--$boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"blob\"\r\n"
                         + "Content-Type: application/octet-stream\r\n\r\n").toByteArray()
-                        + buf.copyOf(n) + "\r\n--$boundary--\r\n".toByteArray()
+                val footer = "\r\n--$boundary--\r\n".toByteArray()
+                val data = buf.copyOf(n)
+                val out = java.io.ByteArrayOutputStream(header.size + data.size + footer.size)
+                out.write(header)
+                out.write(data)
+                out.write(footer)
+                val part = out.toByteArray()
                 val url = "$PAN_HOST/rest/2.0/pcs/superfile2?method=upload&access_token=$token&type=obj" +
                         "&path=${java.net.URLEncoder.encode(remotePath, "UTF-8")}&uploadid=$uploadid&partseq=$seq"
                 val resp = okHttpClient.newCall(
