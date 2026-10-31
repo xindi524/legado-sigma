@@ -56,7 +56,7 @@ object CloudDownloadManager {
             val t = task ?: return@launch
             val tmp = File(appCtx.cacheDir, "cloud_${t.file.name}")
             try {
-                withContext(Dispatchers.IO) {
+                val bookName = withContext(Dispatchers.IO) {
                     val startOffset = if (tmp.exists()) tmp.length() else 0L
                     t.downloaded = startOffset
                     if (startOffset < t.file.size) {
@@ -70,23 +70,32 @@ object CloudDownloadManager {
                     val uri = LocalBook.saveBookFile(tmp.inputStream(), t.file.name)
                     tmp.delete()
                     val book = LocalBook.importFile(uri)
-                    t.state = State.DONE
-                    Toast.makeText(appCtx, "《${book.name}》已加入书架", Toast.LENGTH_SHORT).show()
+                    book.name
+                }
+                t.state = State.DONE
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(appCtx, "《$bookName》已加入书架", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: CancellationException) {
                 t.state = State.PAUSED
             } catch (e: NoBooksDirException) {
                 t.state = State.FAILED
                 t.needReselect = true
-                Toast.makeText(appCtx, "书籍保存位置不可用，请重新选择", Toast.LENGTH_SHORT).show()
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(appCtx, "书籍保存位置不可用，请重新选择", Toast.LENGTH_SHORT).show()
+                }
             } catch (e: SecurityException) {
                 t.state = State.FAILED
                 t.needReselect = true
-                Toast.makeText(appCtx, "书籍保存位置不可用，请重新选择", Toast.LENGTH_SHORT).show()
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(appCtx, "书籍保存位置不可用，请重新选择", Toast.LENGTH_SHORT).show()
+                }
             } catch (e: Exception) {
                 // 保留临时文件供断点续传
                 t.state = State.FAILED
-                Toast.makeText(appCtx, "下载失败：${e.message}", Toast.LENGTH_SHORT).show()
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(appCtx, "下载失败：${e.message}", Toast.LENGTH_SHORT).show()
+                }
             }
             notifyUpdate(true)
         }
