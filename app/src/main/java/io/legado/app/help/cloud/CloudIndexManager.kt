@@ -109,19 +109,6 @@ object CloudIndexManager {
         load()
     }
 
-    /**
-     * 切换账号：加载对应账号的索引缓存
-     */
-    fun setAccount(id: String) {
-        val key = id.ifBlank { "default" }
-        if (key == accountKey && index != null) return
-        accountKey = key
-        index = null
-        indexTime = 0
-        cacheFile = File(appCtx.cacheDir, "cloud_pan_index_$key.json")
-        load()
-    }
-
     fun isFresh(): Boolean =
         index != null && System.currentTimeMillis() - indexTime < MAX_AGE
 
