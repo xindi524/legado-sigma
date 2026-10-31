@@ -66,7 +66,9 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
     private val authLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             if (BaiduPanHelp.hasToken()) {
+                CloudIndexManager.setAccount(BaiduPanHelp.activeAccount()?.id ?: "default")
                 upAuthState()
+                updateAccountMenu()
                 refresh()
             }
         }
@@ -105,7 +107,9 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
         }
         CloudDownloadManager.onUpdate = { showDownloadState() }
         CloudIndexManager.onUpdate = { showIndexHint() }
+        CloudIndexManager.setAccount(BaiduPanHelp.activeAccount()?.id ?: "default")
         CloudIndexManager.ensureFresh()
+        updateAccountMenu()
         binding.btnAuth.setOnClickListener {
             authLauncher.launch(Intent(this, CloudAuthActivity::class.java))
         }
@@ -412,6 +416,7 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
             R.id.menu_refresh -> refresh()
             R.id.menu_baidu_backup -> baiduBackup()
             R.id.menu_baidu_restore -> baiduRestore()
+            R.id.menu_account -> showAccountSelector()
             R.id.menu_logout -> {
                 BaiduPanHelp.clearToken()
                 upAuthState()
@@ -424,6 +429,61 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
     /**
      * 生成完整备份 ZIP 并上传到网盘 /apps/开源阅读D/backup/
      */
+    private fun updateAccountMenu() {
+        binding.toolBar.menu.findItem(R.id.menu_account)?.title =
+            "当前账号：${BaiduPanHelp.activeAccount()?.name ?: "未授权"}"
+    }
+
+    /**
+     * 账号管理：切换 / 添加 / 移除
+     */
+    private fun showAccountSelector() {
+        val accs = BaiduPanHelp.accounts()
+        val active = BaiduPanHelp.activeAccount()
+        val items = ArrayList<String>()
+        accs.forEach { items.add(if (it.id == active?.id) "● ${it.name}" else it.name) }
+        items.add("＋ 添加新账号")
+        if (accs.size > 1 && active != null) items.add("－ 移除当前账号")
+        selector("百度网盘账号", items.toTypedArray()) { _, i ->
+            when {
+                i < accs.size -> {
+                    if (accs[i].id == active?.id) return@selector
+                    if (CloudDownloadManager.task?.state == CloudDownloadManager.State.RUNNING) {
+                        toastOnUi("有文件正在下载，完成或暂停后再切换账号")
+                        return@selector
+                    }
+                    BaiduPanHelp.setActive(accs[i].id)
+                    CloudIndexManager.setAccount(accs[i].id)
+                    updateAccountMenu()
+                    refresh()
+                    toastOnUi("已切换到：${accs[i].name}")
+                }
+                items[i].startsWith("＋") -> {
+                    authLauncher.launch(Intent(this, CloudAuthActivity::class.java))
+                }
+                items[i].startsWith("－") -> {
+                    if (CloudDownloadManager.task?.state == CloudDownloadManager.State.RUNNING) {
+                        toastOnUi("有文件正在下载，完成或暂停后再移除账号")
+                        return@selector
+                    }
+                    BaiduPanHelp.removeActive()
+                    val na = BaiduPanHelp.activeAccount()
+                    if (na != null) {
+                        CloudIndexManager.setAccount(na.id)
+                        updateAccountMenu()
+                        refresh()
+                        toastOnUi("已移除，切换到：${na.name}")
+                    } else {
+                        CloudIndexManager.setAccount("default")
+                        upAuthState()
+                        adapter.setItems(emptyList())
+                        updateAccountMenu()
+                    }
+                }
+            }
+        }
+    }
+
     private fun baiduBackup() {
         lifecycleScope.launch {
             try {
