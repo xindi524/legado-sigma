@@ -54,7 +54,7 @@ class CloudProgressView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         val cx = width / 2f
         val cy = height / 2f
-        val stroke = width * 0.10f
+        val stroke = width * 0.13f
         val radius = width / 2f - stroke
         val themeColor = context.primaryColor
         val secColor = context.secondaryTextColor
@@ -67,7 +67,7 @@ class CloudProgressView @JvmOverloads constructor(
 
         if (done) {
             fillPaint.color = themeColor
-            val s = width * 0.30f
+            val s = width * 0.42f
             playPath.reset()
             playPath.moveTo(cx - s / 2, cy)
             playPath.lineTo(cx - s * 0.1f, cy + s * 0.45f)
@@ -80,11 +80,11 @@ class CloudProgressView @JvmOverloads constructor(
         if (paused) {
             // 继续符号（实心三角）
             fillPaint.color = themeColor
-            val s = width * 0.34f
+            val s = width * 0.44f
             playPath.reset()
             playPath.moveTo(cx - s / 2.2f, cy - s / 2f)
             playPath.lineTo(cx - s / 2.2f, cy + s / 2f)
-            playPath.lineTo(cx + s / 2f, cy)
+            playPath.lineTo(cx + s / 2.2f, cy)
             playPath.close()
             canvas.drawPath(playPath, fillPaint)
             return
@@ -99,8 +99,8 @@ class CloudProgressView @JvmOverloads constructor(
         )
         // 中心进度数字
         textPaint.color = themeColor
-        textPaint.textSize = width * 0.26f
-        canvas.drawText("$progress", cx, cy + textPaint.textSize / 3, textPaint)
+        textPaint.textSize = width * 0.30f
+        canvas.drawText("$progress%", cx, cy + textPaint.textSize / 3, textPaint)
     }
 
 }
