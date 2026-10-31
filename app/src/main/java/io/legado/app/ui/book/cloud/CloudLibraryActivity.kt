@@ -450,7 +450,12 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
                     toastOnUi("已切换到：${accs[i].name}")
                 }
                 i == addIdx -> {
-                    authLauncher.launch(Intent(this, CloudAuthActivity::class.java))
+                    toastOnUi("正在打开授权页…")
+                    try {
+                        authLauncher.launch(Intent(this, CloudAuthActivity::class.java))
+                    } catch (e: Exception) {
+                        toastOnUi("打开授权页失败：${e.message}")
+                    }
                 }
                 i == removeIdx -> {
                     if (CloudDownloadManager.task?.state == CloudDownloadManager.State.RUNNING) {
