@@ -50,7 +50,6 @@ class CloudFileAdapter(
             }
         }
         if (isTaskFile) {
-            ivIcon.visibility = android.view.View.GONE
             cvProgress.visibility = android.view.View.VISIBLE
             val pct = if (task.file.size > 0) {
                 (task.downloaded * 100 / task.file.size).toInt().coerceIn(0, 100)
@@ -59,6 +58,7 @@ class CloudFileAdapter(
             cvProgress.paused = task.state == CloudDownloadManager.State.PAUSED
             cvProgress.done = task.state == CloudDownloadManager.State.DONE
             cvProgress.onToggle = { callBack.toggleTask() }
+            tvSize.visibility = android.view.View.GONE
             tvName.text = when (task.state) {
                 CloudDownloadManager.State.RUNNING -> "${item.name}　下载中"
                 CloudDownloadManager.State.PAUSED -> "${item.name}　已暂停"
@@ -66,8 +66,8 @@ class CloudFileAdapter(
                 CloudDownloadManager.State.FAILED -> "${item.name}　失败"
             }
         } else {
-            ivIcon.visibility = android.view.View.VISIBLE
             cvProgress.visibility = android.view.View.GONE
+            tvSize.visibility = android.view.View.VISIBLE
             tvName.text = item.name
         }
     }
