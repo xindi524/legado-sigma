@@ -28,6 +28,11 @@ class CloudAuthActivity : BaseActivity<ActivityCloudAuthBinding>() {
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         binding.toolBar.setBackgroundColor(primaryColor)
         binding.toolBar.title = "百度网盘授权"
+        // 添加新账号模式：清除 WebView 登录态，强制出现登录页以切换百度账号
+        if (intent.getBooleanExtra("force_new", false)) {
+            android.webkit.CookieManager.getInstance().removeAllCookies(null)
+            android.webkit.CookieManager.getInstance().flush()
+        }
         binding.webView.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true
