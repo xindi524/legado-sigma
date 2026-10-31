@@ -17,7 +17,7 @@ import java.io.File
 object CloudIndexManager {
 
     private const val CACHE_FILE = "cloud_pan_index.json"
-    private const val MAX_AGE = 10 * 60 * 1000L
+    private const val MAX_AGE = 24 * 60 * 60 * 1000L
 
     class Entry(
         val path: String,
