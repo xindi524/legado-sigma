@@ -19,6 +19,7 @@ import io.legado.app.help.cloud.BaiduPanHelp
 import io.legado.app.help.cloud.BaiduPanHelp.CloudFile
 import io.legado.app.help.cloud.CloudDownloadManager
 import io.legado.app.help.cloud.CloudIndexManager
+import io.legado.app.data.appDb
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.storage.Backup
 import io.legado.app.help.storage.Restore
@@ -31,6 +32,7 @@ import io.legado.app.utils.applyTint
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import splitties.init.appCtx
@@ -296,6 +298,13 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
         binding.refreshProgressBar.isAutoLoading = true
         lifecycleScope.launch {
             try {
+                // 书架内已有书籍文件名集合（标记已导入）
+                val shelfNames = withContext(Dispatchers.IO) {
+                    appDb.bookDao.flowAll().first().mapNotNull { b ->
+                        b.originName.ifBlank { null } ?: b.name
+                    }.toHashSet()
+                }
+                adapter.shelfNames = shelfNames
                 val list = BaiduPanHelp.list(currentDir)
                 // 非根目录时首项显示返回上级
                 val display = if (currentDir != "/") {
