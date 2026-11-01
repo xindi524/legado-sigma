@@ -2,30 +2,33 @@ package io.legado.app.ui.book.manage
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.drawable.GradientDrawable
 import android.view.View
 import android.view.ViewGroup
 import io.legado.app.R
 import io.legado.app.base.adapter.ItemViewHolder
 import io.legado.app.base.adapter.RecyclerAdapter
 import io.legado.app.data.entities.Book
-import io.legado.app.databinding.ItemManageCoverBinding
+import io.legado.app.databinding.ItemBookshelfGridBinding
 import io.legado.app.lib.theme.primaryColor
-import io.legado.app.model.BookCover
+import io.legado.app.utils.dpToPx
+import io.legado.app.utils.invisible
 
 /**
  * 书架管理：封面网格模式适配器
+ * 直接复用书架网格 item 布局（item_bookshelf_grid），封面大小与书架完全一致
  * 点击封面切换选中状态，配合底部批量操作栏使用
  */
 class CoverBookAdapter(context: Context, val callBack: BookAdapter.CallBack) :
-    RecyclerAdapter<Book, ItemManageCoverBinding>(context) {
+    RecyclerAdapter<Book, ItemBookshelfGridBinding>(context) {
 
     private val selectedBooks = hashSetOf<Book>()
 
     val selection: List<Book>
         get() = getItems().filter { selectedBooks.contains(it) }
 
-    override fun getViewBinding(parent: ViewGroup): ItemManageCoverBinding {
-        return ItemManageCoverBinding.inflate(inflater, parent, false)
+    override fun getViewBinding(parent: ViewGroup): ItemBookshelfGridBinding {
+        return ItemBookshelfGridBinding.inflate(inflater, parent, false)
     }
 
     override fun onCurrentListChanged() {
@@ -34,37 +37,24 @@ class CoverBookAdapter(context: Context, val callBack: BookAdapter.CallBack) :
 
     override fun convert(
         holder: ItemViewHolder,
-        binding: ItemManageCoverBinding,
+        binding: ItemBookshelfGridBinding,
         item: Book,
         payloads: MutableList<Any>
     ) {
-        val cover = item.getDisplayCover()
-        if (cover.isNullOrEmpty()) {
-            binding.ivCover.setImageResource(R.drawable.image_cover_default)
-        } else {
-            BookCover.load(context, cover).into(binding.ivCover)
-        }
+        binding.ivCover.load(item, false)
         binding.tvName.text = item.name
-        val progress = item.durChapterTitle
-        if (progress.isNullOrEmpty()) {
-            binding.tvProgress.visibility = View.GONE
-        } else {
-            binding.tvProgress.visibility = View.VISIBLE
-            binding.tvProgress.text = progress
-        }
+        // 书架管理模式不显示未读角标与刷新动画
+        binding.bvUnread.invisible()
+        binding.rlLoading.inVisible()
         val checked = selectedBooks.contains(item)
         if (checked) {
-            // 主题色实心圆底 + 白色勾，任何主题下都醒目
-            if (binding.ivCheck.background == null) {
-                val bg = android.graphics.drawable.GradientDrawable().apply {
-                    shape = android.graphics.drawable.GradientDrawable.OVAL
-                    setColor(context.primaryColor)
-                }
-                binding.ivCheck.background = bg
-            } else {
-                (binding.ivCheck.background as? android.graphics.drawable.GradientDrawable)
-                    ?.setColor(context.primaryColor)
+            // 主题色实心圆底 + 白描边 + 粗白勾，任何主题/封面上都醒目
+            val bg = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(context.primaryColor)
+                setStroke(1.5f.dpToPx().toInt(), 0xD9FFFFFF.toInt())
             }
+            binding.ivCheck.background = bg
             binding.ivCheck.visibility = View.VISIBLE
             binding.ivCover.alpha = 0.85f
         } else {
@@ -73,7 +63,7 @@ class CoverBookAdapter(context: Context, val callBack: BookAdapter.CallBack) :
         }
     }
 
-    override fun registerListener(holder: ItemViewHolder, binding: ItemManageCoverBinding) {
+    override fun registerListener(holder: ItemViewHolder, binding: ItemBookshelfGridBinding) {
         binding.root.setOnClickListener {
             getItem(holder.layoutPosition)?.let { book ->
                 toggleSelect(book)
