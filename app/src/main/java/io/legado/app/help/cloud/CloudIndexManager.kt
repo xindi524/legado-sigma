@@ -102,7 +102,7 @@ object CloudIndexManager {
         index = null
         indexTime = 0
         cacheFile = File(appCtx.cacheDir, "cloud_pan_index_$key.json")
-        load()
+        loadSync()
     }
 
     fun isFresh(): Boolean =
