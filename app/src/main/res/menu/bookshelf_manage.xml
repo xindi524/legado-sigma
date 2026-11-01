@@ -25,6 +25,10 @@
         android:title="@string/export_all_use_book_source" />
 
     <item
+        android:id="@+id/menu_toggle_layout"
+        android:title="切换视图" />
+
+    <item
         android:id="@+id/menu_open_book_info_by_click_title"
         android:checkable="true"
         android:title="@string/open_book_info_by_click_title" />
