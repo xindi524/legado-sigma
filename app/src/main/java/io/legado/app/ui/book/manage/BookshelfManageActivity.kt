@@ -16,6 +16,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import io.legado.app.R
 import io.legado.app.base.VMBaseActivity
 import io.legado.app.constant.AppLog
+import io.legado.app.constant.EventBus
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
@@ -45,6 +46,8 @@ import io.legado.app.utils.cnCompare
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.isAbsUrl
+import io.legado.app.utils.postEvent
+import io.legado.app.utils.postEventDelay
 import io.legado.app.utils.putPrefBoolean
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.setEdgeEffectColor
@@ -403,6 +406,16 @@ class BookshelfManageActivity :
         )
     }
 
+    /**
+     * 书的分组归属变化后刷新书架页（拼图封面/分组列表）
+     * 三通道：直调 + 立即事件 + 延迟补发，对齐 GroupViewModel 的成熟模式，防时序竞态
+     */
+    private fun notifyBookshelfGroupChange() {
+        GroupChangeNotifier.notifyChanged()
+        postEvent(EventBus.BOOK_GROUP_CHANGED, "")
+        postEventDelay(EventBus.BOOK_GROUP_CHANGED_DELAYED, "", 600)
+    }
+
     override fun upGroup(requestCode: Int, groupId: Long) {
         when (requestCode) {
             groupRequestCode -> currentSelection.let { books ->
@@ -415,9 +428,9 @@ class BookshelfManageActivity :
             adapter.groupRequestCode -> {
                 adapter.actionItem?.let {
                     lifecycleScope.launch {
-                        // 等写库完成再通知，避免书架页拼图查到旧数据
+                        // 等写库完成再通知（防竞态），直调+事件双保险刷新书架拼图
                         viewModel.updateBookAwait(it.copy(group = groupId))
-                        GroupChangeNotifier.notifyChanged()
+                        notifyBookshelfGroupChange()
                     }
                 }
             }
@@ -428,9 +441,8 @@ class BookshelfManageActivity :
                     book.copy(group = book.group or groupId)
                 }
                 lifecycleScope.launch {
-                    // 等写库完成再通知，避免书架页拼图查到旧数据
                     viewModel.updateBookAwait(*array)
-                    GroupChangeNotifier.notifyChanged()
+                    notifyBookshelfGroupChange()
                 }
             }
 
@@ -440,9 +452,8 @@ class BookshelfManageActivity :
                     book.copy(group = book.group and groupId.inv())
                 }
                 lifecycleScope.launch {
-                    // 等写库完成再通知，避免书架页拼图查到旧数据
                     viewModel.updateBookAwait(*array)
-                    GroupChangeNotifier.notifyChanged()
+                    notifyBookshelfGroupChange()
                 }
             }
         }
