@@ -49,11 +49,7 @@ object CloudIndexManager {
 
     fun progressText(): String = "索引更新中…已扫描 $scanned 个文件夹"
 
-    init {
-        load()
-    }
-
-    private fun load() {
+    private fun loadSync() {
         try {
             if (!cacheFile.exists()) return
             val arr = JSONArray(cacheFile.readText())
@@ -129,30 +125,31 @@ object CloudIndexManager {
      * 索引缺失或过期时后台重建；重建期间旧索引继续可用
      */
     fun ensureFresh() {
-        if (building || isFresh()) return
-        rebuild()
-    }
-
-    fun rebuild() {
         if (building) return
         building = true
-        scanned = 0
-        lastError = null
-        notifyUpdate(true)
         scope.launch {
             try {
-                val list = withContext(Dispatchers.IO) {
-                    BaiduPanHelp.collectAll("/") { s, _ ->
-                        scanned = s
-                        notifyUpdate()
-                    }
+                // 磁盘索引异步加载（几 MB JSON 不能在主线程解析）
+                if (index == null) {
+                    withContext(Dispatchers.IO) { loadSync() }
+                    notifyUpdate(true)
                 }
-                index = list.map { Entry(it.path, it.name, it.isDir, it.size, it.fsId) }
-                indexTime = System.currentTimeMillis()
-                withContext(Dispatchers.IO) { save() }
-                Toast.makeText(appCtx, "网盘索引已就绪（${index?.size ?: 0} 项）", Toast.LENGTH_SHORT).show()
+                // 加载后仍未过期则无需重建
+                if (!isFresh()) {
+                    withContext(Dispatchers.IO) {
+                        scanned = 0
+                        lastError = null
+                        val list = BaiduPanHelp.collectAll("/") { s, _ ->
+                            scanned = s
+                            notifyUpdate()
+                        }
+                        index = list.map { Entry(it.path, it.name, it.isDir, it.size, it.fsId) }
+                        indexTime = System.currentTimeMillis()
+                        save()
+                    }
+                    Toast.makeText(appCtx, "网盘索引已就绪（${index?.size ?: 0} 项）", Toast.LENGTH_SHORT).show()
+                }
             } catch (e: Exception) {
-                // 保留旧索引，但把失败显式告知
                 lastError = e.message ?: "未知错误"
                 Toast.makeText(appCtx, "索引更新失败：$lastError", Toast.LENGTH_LONG).show()
             } finally {
@@ -161,6 +158,7 @@ object CloudIndexManager {
             }
         }
     }
+
 
     /**
      * 用索引做全盘过滤（内存瞬时完成），按匹配度打分排序
