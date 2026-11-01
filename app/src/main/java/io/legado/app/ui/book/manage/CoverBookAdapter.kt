@@ -53,9 +53,24 @@ class CoverBookAdapter(context: Context, val callBack: BookAdapter.CallBack) :
             binding.tvProgress.text = progress
         }
         val checked = selectedBooks.contains(item)
-        binding.ivCheck.visibility = if (checked) View.VISIBLE else View.GONE
-        binding.ivCheck.setColorFilter(context.primaryColor)
-        binding.ivCover.alpha = if (checked) 0.7f else 1f
+        if (checked) {
+            // 主题色实心圆底 + 白色勾，任何主题下都醒目
+            if (binding.ivCheck.background == null) {
+                val bg = android.graphics.drawable.GradientDrawable().apply {
+                    shape = android.graphics.drawable.GradientDrawable.OVAL
+                    setColor(context.primaryColor)
+                }
+                binding.ivCheck.background = bg
+            } else {
+                (binding.ivCheck.background as? android.graphics.drawable.GradientDrawable)
+                    ?.setColor(context.primaryColor)
+            }
+            binding.ivCheck.visibility = View.VISIBLE
+            binding.ivCover.alpha = 0.85f
+        } else {
+            binding.ivCheck.visibility = View.GONE
+            binding.ivCover.alpha = 1f
+        }
     }
 
     override fun registerListener(holder: ItemViewHolder, binding: ItemManageCoverBinding) {
