@@ -61,7 +61,9 @@ class CloudFileAdapter(
             cvProgress.paused = task.state == CloudDownloadManager.State.PAUSED
             cvProgress.done = task.state == CloudDownloadManager.State.DONE
             cvProgress.onToggle = { callBack.toggleTask() }
-            tvSize.visibility = android.view.View.GONE
+            // 大小字段双保险显示进度（不依赖圆环控件）
+            tvSize.visibility = android.view.View.VISIBLE
+            tvSize.text = "已下载 $pct%"
             tvName.text = when (task.state) {
                 CloudDownloadManager.State.RUNNING -> "${item.name}　下载中"
                 CloudDownloadManager.State.PAUSED -> "${item.name}　已暂停"
@@ -71,11 +73,16 @@ class CloudFileAdapter(
         } else {
             cvProgress.visibility = android.view.View.GONE
             tvSize.visibility = android.view.View.VISIBLE
+            tvSize.text = when {
+                item.size >= 1024 * 1024 -> String.format("%.1f MB", item.size / 1048576f)
+                item.size >= 1024 -> String.format("%.0f KB", item.size / 1024f)
+                else -> "${item.size} B"
+            }
             tvName.text = item.name
         }
-        // 已导入过书架的文件在名称后追加标记
-        if (!item.isDir && item.name in shelfNames) {
-            tvName.text = "${tvName.text}　已导入"
+        // 已导入过书架的文件在大小字段标记
+        if (!item.isDir && item.name in shelfNames && !isTaskFile) {
+            tvSize.text = "已导入 · ${tvSize.text}"
         }
     }
 
