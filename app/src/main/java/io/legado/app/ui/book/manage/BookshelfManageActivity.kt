@@ -10,6 +10,7 @@ import androidx.activity.viewModels
 import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.SearchView
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import io.legado.app.R
@@ -22,6 +23,7 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.databinding.ActivityArrangeBookBinding
 import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.DirectLinkUpload
+import io.legado.app.help.GroupChangeNotifier
 import io.legado.app.help.book.contains
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.config.AppConfig
@@ -41,7 +43,9 @@ import io.legado.app.ui.widget.recycler.VerticalDivider
 import io.legado.app.utils.applyTint
 import io.legado.app.utils.cnCompare
 import io.legado.app.utils.dpToPx
+import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.isAbsUrl
+import io.legado.app.utils.putPrefBoolean
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.setEdgeEffectColor
 import io.legado.app.utils.showDialogFragment
@@ -75,6 +79,13 @@ class BookshelfManageActivity :
     private val addToGroupRequestCode = 34
     private val removeToGroupRequestCode = 42
     private val adapter by lazy { BookAdapter(this, this) }
+    private val coverAdapter by lazy { CoverBookAdapter(this, this) }
+    // 封面网格模式（右上角菜单切换视图），onActivityCreated 读取
+    private var coverMode = false
+    private var dragSelectTouchHelper: DragSelectTouchHelper? = null
+    private val verticalDivider by lazy { VerticalDivider(this) }
+    private val currentSelection: List<Book>
+        get() = if (coverMode) coverAdapter.selection else adapter.selection
     private val itemTouchCallback by lazy { ItemTouchCallback(adapter) }
     private var booksFlowJob: Job? = null
     private var menu: Menu? = null
@@ -102,6 +113,7 @@ class BookshelfManageActivity :
     }
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        coverMode = getPrefBoolean("manageCoverMode")
         viewModel.groupId = intent.getLongExtra("groupId", -1)
         lifecycleScope.launch {
             viewModel.groupName = withContext(IO) {
@@ -145,11 +157,11 @@ class BookshelfManageActivity :
     }
 
     override fun selectAll(selectAll: Boolean) {
-        adapter.selectAll(selectAll)
+        if (coverMode) coverAdapter.selectAll(selectAll) else adapter.selectAll(selectAll)
     }
 
     override fun revertSelection() {
-        adapter.revertSelection()
+        if (coverMode) coverAdapter.revertSelection() else adapter.revertSelection()
     }
 
     override fun onClickSelectBarMainAction() {
@@ -178,17 +190,37 @@ class BookshelfManageActivity :
 
     private fun initRecyclerView() {
         binding.recyclerView.setEdgeEffectColor(primaryColor)
-        binding.recyclerView.layoutManager = LinearLayoutManager(this)
-        binding.recyclerView.addItemDecoration(VerticalDivider(this))
-        binding.recyclerView.adapter = adapter
-        itemTouchCallback.isCanDrag = AppConfig.bookshelfSort == 3
+        setupRecyclerViewLayout()
         val dragSelectTouchHelper: DragSelectTouchHelper =
             DragSelectTouchHelper(adapter.dragSelectCallback).setSlideArea(16, 50)
         dragSelectTouchHelper.attachToRecyclerView(binding.recyclerView)
+        this.dragSelectTouchHelper = dragSelectTouchHelper
         // When this page is opened, it is in selection mode
-        dragSelectTouchHelper.activeSlideSelect()
+        if (coverMode) {
+            // 封面模式：点击选择，停用长按滑选
+            dragSelectTouchHelper.inactiveSelect()
+        } else {
+            dragSelectTouchHelper.activeSlideSelect()
+        }
         // Note: need judge selection first, so add ItemTouchHelper after it.
         ItemTouchHelper(itemTouchCallback).attachToRecyclerView(binding.recyclerView)
+    }
+
+    /**
+     * 按当前模式设置 RecyclerView 布局与适配器（列表 / 封面网格）
+     */
+    private fun setupRecyclerViewLayout() {
+        binding.recyclerView.removeItemDecoration(verticalDivider)
+        if (coverMode) {
+            binding.recyclerView.layoutManager = GridLayoutManager(this, 3)
+            binding.recyclerView.adapter = coverAdapter
+            itemTouchCallback.isCanDrag = false
+        } else {
+            binding.recyclerView.layoutManager = LinearLayoutManager(this)
+            binding.recyclerView.addItemDecoration(verticalDivider)
+            binding.recyclerView.adapter = adapter
+            itemTouchCallback.isCanDrag = AppConfig.bookshelfSort == 3
+        }
     }
 
     private fun initOtherView() {
@@ -266,11 +298,13 @@ class BookshelfManageActivity :
             val searchKey = searchView.query
             if (searchKey.isNullOrEmpty()) {
                 adapter.setItems(books)
+                coverAdapter.setItems(books)
             } else {
                 books.filter {
                     it.contains(searchKey.toString())
                 }.let {
                     adapter.setItems(it)
+                    coverAdapter.setItems(it)
                 }
             }
         }
@@ -279,6 +313,15 @@ class BookshelfManageActivity :
     override fun onCompatOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.menu_group_manage -> showDialogFragment<GroupManageDialog>()
+            R.id.menu_toggle_layout -> {
+                coverMode = !coverMode
+                putPrefBoolean("manageCoverMode", coverMode)
+                setupRecyclerViewLayout()
+                dragSelectTouchHelper?.let {
+                    if (coverMode) it.inactiveSelect() else it.activeSlideSelect()
+                }
+                upBookData()
+            }
             R.id.menu_open_book_info_by_click_title -> {
                 AppConfig.openBookInfoByClickTitle = !item.isChecked
                 adapter.notifyItemRangeChanged(0, adapter.itemCount)
@@ -310,15 +353,15 @@ class BookshelfManageActivity :
         when (item?.itemId) {
             R.id.menu_del_selection -> alertDelSelection()
             R.id.menu_update_enable ->
-                viewModel.upCanUpdate(adapter.selection, true)
+                viewModel.upCanUpdate(currentSelection, true)
 
             R.id.menu_update_disable ->
-                viewModel.upCanUpdate(adapter.selection, false)
+                viewModel.upCanUpdate(currentSelection, false)
 
             R.id.menu_add_to_group -> selectGroup(addToGroupRequestCode, 0)
             R.id.menu_remove_to_group -> selectGroup(removeToGroupRequestCode, 0)
             R.id.menu_change_source -> showDialogFragment<SourcePickerDialog>()
-            R.id.menu_clear_cache -> viewModel.clearCache(adapter.selection)
+            R.id.menu_clear_cache -> viewModel.clearCache(currentSelection)
             R.id.menu_check_selected_interval -> adapter.checkSelectedInterval()
         }
         return false
@@ -346,7 +389,7 @@ class BookshelfManageActivity :
             customView { view }
             okButton {
                 LocalConfig.deleteBookOriginal = checkBox.isChecked
-                viewModel.deleteBook(adapter.selection, checkBox.isChecked)
+                viewModel.deleteBook(currentSelection, checkBox.isChecked)
             }
             noButton()
         }
@@ -360,7 +403,7 @@ class BookshelfManageActivity :
 
     override fun upGroup(requestCode: Int, groupId: Long) {
         when (requestCode) {
-            groupRequestCode -> adapter.selection.let { books ->
+            groupRequestCode -> currentSelection.let { books ->
                 val array = Array(books.size) {
                     books[it].copy(group = groupId)
                 }
@@ -370,29 +413,35 @@ class BookshelfManageActivity :
             adapter.groupRequestCode -> {
                 adapter.actionItem?.let {
                     viewModel.updateBook(it.copy(group = groupId))
+                    // 书的分组归属变了，通知书架页刷新分组拼图封面
+                    GroupChangeNotifier.notifyChanged()
                 }
             }
 
-            addToGroupRequestCode -> adapter.selection.let { books ->
+            addToGroupRequestCode -> currentSelection.let { books ->
                 val array = Array(books.size) { index ->
                     val book = books[index]
                     book.copy(group = book.group or groupId)
                 }
                 viewModel.updateBook(*array)
+                // 书的分组归属变了，通知书架页刷新分组拼图封面
+                GroupChangeNotifier.notifyChanged()
             }
 
-            removeToGroupRequestCode -> adapter.selection.let { books ->
+            removeToGroupRequestCode -> currentSelection.let { books ->
                 val array = Array(books.size) { index ->
                     val book = books[index]
                     book.copy(group = book.group and groupId.inv())
                 }
                 viewModel.updateBook(*array)
+                // 书的分组归属变了，通知书架页刷新分组拼图封面
+                GroupChangeNotifier.notifyChanged()
             }
         }
     }
 
     override fun upSelectCount() {
-        binding.selectActionBar.upCountView(adapter.selection.size, adapter.getItems().size)
+        binding.selectActionBar.upCountView(currentSelection.size, if (coverMode) coverAdapter.itemCount else adapter.itemCount)
     }
 
     override fun updateBook(vararg book: Book) {
@@ -430,7 +479,7 @@ class BookshelfManageActivity :
     }
 
     override fun sourceOnClick(source: BookSource) {
-        viewModel.changeSource(adapter.selection, source)
+        viewModel.changeSource(currentSelection, source)
         viewModel.batchChangeSourceState.value = true
     }
 
