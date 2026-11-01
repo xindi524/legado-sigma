@@ -239,13 +239,13 @@ class CacheActivity : VMBaseActivity<ActivityCacheBookBinding, CacheViewModel>()
     private fun initBookData() {
         booksFlowJob?.cancel()
         booksFlowJob = lifecycleScope.launch {
-            // 嵌套分组：父分组包含子分组书籍（掩码递归）；默认书架/全部书籍显示所有书
-            val bookFlow = when {
-                groupId == BookGroup.IdRoot || groupId == BookGroup.IdAll ->
-                    appDb.bookDao.flowAll()
-                groupId > 0 -> appDb.bookDao.flowByGroupMask(
-                    BookGroup.computeMask(groupId) { appDb.bookGroupDao.getByParent(it) }
-                )
+            // 分组查询保持原版语义（父不含子）；默认书架=未分组（本地+网络合并）；全部书籍=所有书
+            val bookFlow = when (groupId) {
+                BookGroup.IdRoot -> kotlinx.coroutines.flow.combine(
+                    appDb.bookDao.flowLocalNoGroup(),
+                    appDb.bookDao.flowNetNoGroup()
+                ) { local, net -> local + net }
+                BookGroup.IdAll -> appDb.bookDao.flowAll()
                 else -> appDb.bookDao.flowByGroup(groupId)
             }
             bookFlow.map { books ->
