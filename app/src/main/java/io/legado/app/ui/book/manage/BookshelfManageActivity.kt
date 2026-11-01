@@ -212,7 +212,9 @@ class BookshelfManageActivity :
     private fun setupRecyclerViewLayout() {
         binding.recyclerView.removeItemDecoration(verticalDivider)
         if (coverMode) {
-            binding.recyclerView.layoutManager = GridLayoutManager(this, 3)
+            // 列数与书架网格保持一致，封面大小视觉统一；书架为列表布局时用 3 列兜底
+            val span = if (AppConfig.bookshelfLayout >= 2) AppConfig.bookshelfLayout else 3
+            binding.recyclerView.layoutManager = GridLayoutManager(this, span)
             binding.recyclerView.adapter = coverAdapter
             itemTouchCallback.isCanDrag = false
         } else {
