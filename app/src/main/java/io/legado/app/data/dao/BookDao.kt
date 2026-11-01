@@ -76,7 +76,8 @@ interface BookDao {
     fun flowByUserGroup(group: Long): Flow<List<Book>>
 
     // F2 分组拼图：取分组内最近阅读的前 N 本书作为拼图封面素材
-    @Query("SELECT * FROM books WHERE (`group` & :group) > 0 ORDER BY durChapterTime DESC LIMIT :limit")
+    // 从未读过的书 durChapterTime=0 会沉底，改用 latestChapterTime 兜底，保证新加入分组的书能进拼图
+    @Query("SELECT * FROM books WHERE (`group` & :group) > 0 ORDER BY CASE WHEN durChapterTime > 0 THEN durChapterTime ELSE latestChapterTime END DESC LIMIT :limit")
     fun getBooksForGroupPreview(group: Long, limit: Int): List<Book>
 
     // F2 分组拼图：分组的"最后阅读时间" = 组内书的最新 durChapterTime（用于书/子分组混排）
