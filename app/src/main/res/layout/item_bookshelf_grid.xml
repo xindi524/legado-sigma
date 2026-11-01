@@ -52,6 +52,19 @@
                 app:layout_constraintTop_toTopOf="parent"
                 tools:ignore="RtlHardcoded" />
 
+            <ImageView
+                android:id="@+id/iv_check"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="right"
+                android:layout_margin="5dp"
+                android:contentDescription="@string/book_name"
+                android:src="@drawable/ic_check_bold_white"
+                android:visibility="gone"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintRight_toRightOf="parent"
+                tools:ignore="RtlHardcoded" />
+
             <io.legado.app.ui.widget.anima.RotateLoading
                 android:id="@+id/rl_loading"
                 android:layout_width="22dp"
