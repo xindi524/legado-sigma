@@ -400,6 +400,15 @@ class BookshelfFragment2() : BaseBookshelfFragment(R.layout.fragment_bookshelf2)
     }
 
     @SuppressLint("NotifyDataSetChanged")
+    override fun onResume() {
+        super.onResume()
+        // 从书架管理/书详情等页面返回的兜底：书的分组归属可能已变，强制重绑刷新分组拼图封面
+        binding.rvBookshelf.post {
+            booksAdapter.notifyDataSetChanged()
+        }
+    }
+
+    @SuppressLint("NotifyDataSetChanged")
     override fun observeLiveBus() {
         super.observeLiveBus()
         observeEvent<String>(EventBus.UP_BOOKSHELF) {
