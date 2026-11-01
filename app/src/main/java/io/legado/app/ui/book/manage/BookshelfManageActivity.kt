@@ -412,9 +412,11 @@ class BookshelfManageActivity :
 
             adapter.groupRequestCode -> {
                 adapter.actionItem?.let {
-                    viewModel.updateBook(it.copy(group = groupId))
-                    // 书的分组归属变了，通知书架页刷新分组拼图封面
-                    GroupChangeNotifier.notifyChanged()
+                    lifecycleScope.launch {
+                        // 等写库完成再通知，避免书架页拼图查到旧数据
+                        viewModel.updateBookAwait(it.copy(group = groupId))
+                        GroupChangeNotifier.notifyChanged()
+                    }
                 }
             }
 
@@ -423,9 +425,11 @@ class BookshelfManageActivity :
                     val book = books[index]
                     book.copy(group = book.group or groupId)
                 }
-                viewModel.updateBook(*array)
-                // 书的分组归属变了，通知书架页刷新分组拼图封面
-                GroupChangeNotifier.notifyChanged()
+                lifecycleScope.launch {
+                    // 等写库完成再通知，避免书架页拼图查到旧数据
+                    viewModel.updateBookAwait(*array)
+                    GroupChangeNotifier.notifyChanged()
+                }
             }
 
             removeToGroupRequestCode -> currentSelection.let { books ->
@@ -433,9 +437,11 @@ class BookshelfManageActivity :
                     val book = books[index]
                     book.copy(group = book.group and groupId.inv())
                 }
-                viewModel.updateBook(*array)
-                // 书的分组归属变了，通知书架页刷新分组拼图封面
-                GroupChangeNotifier.notifyChanged()
+                lifecycleScope.launch {
+                    // 等写库完成再通知，避免书架页拼图查到旧数据
+                    viewModel.updateBookAwait(*array)
+                    GroupChangeNotifier.notifyChanged()
+                }
             }
         }
     }
