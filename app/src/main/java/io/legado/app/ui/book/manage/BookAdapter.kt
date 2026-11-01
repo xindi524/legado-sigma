@@ -55,11 +55,8 @@ class BookAdapter(context: Context, val callBack: CallBack) :
             tvAuthor.visibility = if (item.author.isEmpty()) View.GONE else View.VISIBLE
             tvGroupS.text = getGroupName(item.group)
             checkbox.isChecked = selectedBooks.contains(item)
-            if (item.isLocal) {
-                tvOrigin.setText(R.string.local_book)
-            } else {
-                tvOrigin.text = item.originName
-            }
+            // 来源信息在管理模式冗余，不再显示
+            tvOrigin.visibility = View.GONE
         }
     }
 
