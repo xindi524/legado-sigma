@@ -102,7 +102,7 @@ object CloudIndexManager {
         index = null
         indexTime = 0
         cacheFile = File(appCtx.cacheDir, "cloud_pan_index_$key.json")
-        loadSync()
+        // 不在主线程读盘，索引缓存交给 ensureFresh 在 IO 线程异步加载
     }
 
     fun isFresh(): Boolean =
