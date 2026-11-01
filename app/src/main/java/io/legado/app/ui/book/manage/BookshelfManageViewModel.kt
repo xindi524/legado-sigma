@@ -52,6 +52,13 @@ class BookshelfManageViewModel(application: Application) : BaseViewModel(applica
         }
     }
 
+    /**
+     * 挂起版更新：写库完成后才返回，供调用方在写库后触发分组拼图刷新（防竞态）
+     */
+    suspend fun updateBookAwait(vararg book: Book) {
+        appDb.bookDao.update(*book)
+    }
+
     fun deleteBook(books: List<Book>, deleteOriginal: Boolean = false) {
         execute {
             appDb.bookDao.delete(*books.toTypedArray())
