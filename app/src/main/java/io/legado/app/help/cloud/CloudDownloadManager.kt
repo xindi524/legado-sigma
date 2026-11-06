@@ -147,6 +147,20 @@ object CloudDownloadManager {
         }
     }
 
+    /**
+     * 只取消当前任务，队列中的下一个自动开始
+     */
+    fun cancelCurrent() {
+        job?.cancel()
+        task = null
+        val next = pendingFiles.removeFirstOrNull()
+        if (next != null) {
+            download(next)
+        } else {
+            notifyUpdate(true)
+        }
+    }
+
     fun clear() {
         job?.cancel()
         task = null
