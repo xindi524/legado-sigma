@@ -101,6 +101,8 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
             true
         }
         CloudDownloadManager.onUpdate = { showDownloadState() }
+        binding.btnDownloadToggle.setOnClickListener { toggleTask() }
+        binding.downloadBar.setOnClickListener { toggleTask() }
         CloudIndexManager.onUpdate = { showIndexHint() }
         CloudIndexManager.setAccount(BaiduPanHelp.activeAccount()?.id ?: "default")
         CloudIndexManager.ensureFresh()
@@ -373,9 +375,28 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
      * 显示下载任务状态：精确刷新列表中任务文件的圆环
      */
     private fun showDownloadState() {
-        val t = CloudDownloadManager.task ?: return
+        val t = CloudDownloadManager.task
+        // 常驻下载状态条：无论当前浏览哪个目录，下载任务都可见可控
+        binding.downloadBar.visibility = if (t == null) View.GONE else View.VISIBLE
+        if (t != null) {
+            binding.tvDownloadName.text = t.file.name
+            binding.tvDownloadState.text = when (t.state) {
+                CloudDownloadManager.State.RUNNING ->
+                    if (t.file.size > 0) "${t.downloaded * 100 / t.file.size}%" else "0%"
+                CloudDownloadManager.State.PAUSED -> "已暂停"
+                CloudDownloadManager.State.DONE -> "已完成"
+                CloudDownloadManager.State.FAILED -> "失败"
+            }
+            binding.btnDownloadToggle.text = when (t.state) {
+                CloudDownloadManager.State.RUNNING -> "暂停"
+                CloudDownloadManager.State.PAUSED -> "继续"
+                else -> "关闭"
+            }
+        }
+        // 当前列表里的对应项圆环同步刷新
+        val task = t ?: return
         val pos = (0 until adapter.itemCount).firstOrNull {
-            adapter.getItem(it)?.path == t.file.path
+            adapter.getItem(it)?.path == task.file.path
         } ?: return
         adapter.notifyItemChanged(pos, "task")
     }
