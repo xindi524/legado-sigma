@@ -109,10 +109,20 @@
             android:textSize="12sp" />
 
         <TextView
-            android:id="@+id/btn_download_toggle"
+            android:id="@+id/btn_download_cancel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="12dp"
+            android:padding="6dp"
+            android:text="取消"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/btn_download_toggle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
             android:padding="6dp"
             android:text="暂停"
             android:textColor="?attr/colorPrimary"
