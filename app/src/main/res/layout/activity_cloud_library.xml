@@ -72,6 +72,11 @@
         android:ellipsize="start"
         tools:text="/apps" />
 
+    <io.legado.app.ui.widget.anima.RefreshProgressBar
+        android:id="@+id/refresh_progress_bar"
+        android:layout_width="match_parent"
+        android:layout_height="2dp" />
+
     <LinearLayout
         android:id="@+id/download_bar"
         android:layout_width="match_parent"
@@ -80,39 +85,40 @@
         android:gravity="center_vertical"
         android:paddingStart="14dp"
         android:paddingEnd="14dp"
-        android:paddingTop="4dp"
-        android:paddingBottom="4dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:background="?android:attr/selectableItemBackground"
         android:visibility="gone">
 
         <TextView
-            android:id="@+id/tv_download_text"
+            android:id="@+id/tv_download_name"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:textSize="13sp"
-            android:maxLines="1"
-            android:ellipsize="end"
-            tools:text="下载中「斗破苍穹.txt」42%" />
+            android:ellipsize="middle"
+            android:singleLine="true"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/tv_download_state"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="12sp" />
 
         <TextView
             android:id="@+id/btn_download_toggle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp"
-            android:textSize="13sp"
-            android:background="?android:attr/selectableItemBackground"
-            tools:text="暂停" />
+            android:layout_marginStart="12dp"
+            android:padding="6dp"
+            android:text="暂停"
+            android:textColor="?attr/colorPrimary"
+            android:textSize="13sp" />
 
     </LinearLayout>
-
-    <io.legado.app.ui.widget.anima.RefreshProgressBar
-        android:id="@+id/refresh_progress_bar"
-        android:layout_width="match_parent"
-        android:layout_height="2dp" />
 
     <FrameLayout
         android:layout_width="match_parent"
