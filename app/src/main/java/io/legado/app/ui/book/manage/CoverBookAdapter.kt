@@ -48,13 +48,17 @@ class CoverBookAdapter(context: Context, val callBack: BookAdapter.CallBack) :
         binding.rlLoading.inVisible()
         val checked = selectedBooks.contains(item)
         if (checked) {
-            // 主题色实心圆底 + 白描边 + 粗白勾，任何主题/封面上都醒目
+            // 主题色实心圆底 + 深色描边；勾色按主题色亮度自适应（浅主题色用黑勾，深主题色用白勾）
             val bg = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(context.primaryColor)
-                setStroke(1.5f.dpToPx().toInt(), 0xD9FFFFFF.toInt())
+                setStroke(1.5f.dpToPx().toInt(), 0x8A000000.toInt())
             }
             binding.ivCheck.background = bg
+            val lum = androidx.core.graphics.ColorUtils.calculateLuminance(context.primaryColor)
+            binding.ivCheck.setImageResource(
+                if (lum > 0.5) R.drawable.ic_check_bold_dark else R.drawable.ic_check_bold_white
+            )
             binding.ivCheck.visibility = View.VISIBLE
             binding.ivCover.alpha = 0.85f
         } else {
