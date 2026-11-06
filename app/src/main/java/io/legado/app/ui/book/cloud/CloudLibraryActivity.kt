@@ -7,6 +7,7 @@ import android.view.MenuItem
 import android.view.View
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.Toolbar
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
@@ -102,10 +103,7 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
         }
         CloudDownloadManager.onUpdate = { showDownloadState() }
         binding.btnDownloadToggle.setOnClickListener { toggleTask() }
-        binding.btnDownloadCancel.setOnClickListener {
-            CloudDownloadManager.clear()
-            toastOnUi("已取消下载")
-        }
+        binding.btnDownloadCancel.setOnClickListener { showCancelMenu(it) }
         binding.downloadBar.setOnClickListener { toggleTask() }
         CloudIndexManager.onUpdate = { showIndexHint() }
         CloudIndexManager.setAccount(BaiduPanHelp.activeAccount()?.id ?: "default")
@@ -415,6 +413,35 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
             // 暂停继续 / 失败重试（保存位置修复后）
             else -> CloudDownloadManager.resume()
         }
+    }
+
+    /**
+     * 取消菜单：有等待队列时区分"取消当前/取消全部"，单任务直接取消
+     */
+    private fun showCancelMenu(anchor: View) {
+        if (CloudDownloadManager.pendingCount <= 0) {
+            CloudDownloadManager.clear()
+            toastOnUi("已取消下载")
+            return
+        }
+        val popup = PopupMenu(this, anchor)
+        popup.menu.add("取消当前（继续下一个）")
+        popup.menu.add("取消全部")
+        popup.menu.applyTint(this)
+        popup.setOnMenuItemClickListener { mi ->
+            when (mi.title.toString()) {
+                "取消当前（继续下一个）" -> {
+                    CloudDownloadManager.cancelCurrent()
+                    toastOnUi("已取消当前文件")
+                }
+                else -> {
+                    CloudDownloadManager.clear()
+                    toastOnUi("已取消全部下载")
+                }
+            }
+            true
+        }
+        popup.show()
     }
 
     /**
