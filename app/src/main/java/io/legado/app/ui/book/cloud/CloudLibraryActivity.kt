@@ -102,6 +102,10 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
         }
         CloudDownloadManager.onUpdate = { showDownloadState() }
         binding.btnDownloadToggle.setOnClickListener { toggleTask() }
+        binding.btnDownloadCancel.setOnClickListener {
+            CloudDownloadManager.clear()
+            toastOnUi("已取消下载")
+        }
         binding.downloadBar.setOnClickListener { toggleTask() }
         CloudIndexManager.onUpdate = { showIndexHint() }
         CloudIndexManager.setAccount(BaiduPanHelp.activeAccount()?.id ?: "default")
