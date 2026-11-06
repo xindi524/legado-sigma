@@ -272,10 +272,6 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
             }
             return
         }
-        if (CloudDownloadManager.task?.state == CloudDownloadManager.State.RUNNING) {
-            toastOnUi("已有文件在下载中，请先暂停或等待完成")
-            return
-        }
         alert("下载并导入") {
             setMessage(
                 "「${file.name}」（${formatSize(file.size)}）\n\n" +
@@ -379,7 +375,13 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
         // 常驻下载状态条：无论当前浏览哪个目录，下载任务都可见可控
         binding.downloadBar.visibility = if (t == null) View.GONE else View.VISIBLE
         if (t != null) {
-            binding.tvDownloadName.text = t.file.name
+            val pending = CloudDownloadManager.pendingCount
+            val queueTag = if (pending > 0) {
+                val total = pending + 1
+                val cur = total - pending
+                "（$cur/$total）"
+            } else ""
+            binding.tvDownloadName.text = "${t.file.name}$queueTag"
             binding.tvDownloadState.text = when (t.state) {
                 CloudDownloadManager.State.RUNNING ->
                     if (t.file.size > 0) "${t.downloaded * 100 / t.file.size}%" else "0%"
@@ -389,8 +391,7 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
             }
             binding.btnDownloadToggle.text = when (t.state) {
                 CloudDownloadManager.State.RUNNING -> "暂停"
-                CloudDownloadManager.State.PAUSED -> "继续"
-                else -> "关闭"
+                else -> "继续"
             }
         }
         // 当前列表里的对应项圆环同步刷新
@@ -407,8 +408,8 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
         val t = CloudDownloadManager.task ?: return
         when (t.state) {
             CloudDownloadManager.State.RUNNING -> CloudDownloadManager.pause()
-            CloudDownloadManager.State.PAUSED -> CloudDownloadManager.resume()
-            else -> CloudDownloadManager.clear()
+            // 暂停继续 / 失败重试（保存位置修复后）
+            else -> CloudDownloadManager.resume()
         }
     }
 
