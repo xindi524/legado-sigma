@@ -1,9 +1,10 @@
 <div align="center">
-<img width="125" height="125" src="https://gitee.com/lyc486/legado/raw/main/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" alt="legado"/>
+<img width="125" height="125" src="https://raw.githubusercontent.com/xindi524/legado-sigma/main/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" alt="legado"/>
 <br>
-阅读Sigma
+阅读deep
 <br>
-阅读Sigma继承自<a href="https://github.com/gedoor/legado" target="_blank">Legado</a>，延续开源阅读项目，在其基础上新增更多功能。
+阅读deep基于开源阅读 <a href="https://github.com/gedoor/legado" target="_blank">Legado</a> 深度增强，开源免费，延续阅读精神。
+本分支新增：书架分组多级嵌套 · 分组封面拼图 · 多正则+手动分章 · 多引擎搜书封面 · 百度网盘云端书库。
 </div>
 
 ## 版本说明
@@ -39,6 +40,15 @@
 4.更丰富的书源功能实现。<br>
 5.更完善的订阅源功能。<br>
 </details>
+
+### 深度增强功能（deep 新增）
+1.**书架分组多级嵌套**：分组下可再建分组，任意层级树形管理，删组自动提升子组。<br>
+2.**分组封面拼图**：分组卡片自动显示组内书籍封面拼图，随阅读进度实时更新，空组显示组名文字封面。<br>
+3.**分章体系升级**：单书多正则合并分章（规则可多选组合）；阅读界面长按选中文字即可设为章节标题或撤销误分章，手动标记优先于正则。<br>
+4.**多引擎搜书封面**：百度/Bing/搜狗/360/Google 五引擎网页搜索，浏览结果长按图片即可设为封面。<br>
+5.**云端书库（百度网盘）**：OAuth 授权支持多账号切换；目录浏览面包屑导航；秒级本地索引+服务端语义搜索双引擎，精确/模糊可切换；**多文件队列下载**支持断点续传、暂停/继续、取消当前/取消全部；书籍保存到自定义授权文件夹，直接加入书架。<br>
+6.**网盘备份/恢复**：书架数据打包备份到网盘，换机一键恢复。<br>
+7.小窗模式下书架返回键可用（补返回箭头）。
 
 <a href="#readme">
     <img src="https://img.shields.io/badge/-返回顶部-orange.svg" alt="#" align="right">
@@ -107,6 +117,11 @@ https://www.yuque.com/legado/wiki/community
 > * com.positiondev.epublib:epublib-core
 > * com.github.Moriafly:LyricViewX
 > * io.github.rosemoe:editor
+
+**项目实现中参考借鉴了以下开源项目的思路与设计，一并致谢**：
+> * [Legado](https://github.com/gedoor/legado)：原版开源阅读，本项目的根基
+> * [清墨 Light-Ink](http://lightink.zhendong.ltd/)：云端书库（网盘开放平台接入）实现参考
+> * [Readingo](http://ismyway.com/)：云端书库搜索与文件管理交互参考
 <a href="#readme">
     <img src="https://img.shields.io/badge/-返回顶部-orange.svg" alt="#" align="right">
 </a>
