@@ -3,37 +3,45 @@ package io.legado.app.help.update
 import androidx.annotation.Keep
 import io.legado.app.constant.AppConst
 import io.legado.app.exception.NoStackTraceException
-import io.legado.app.help.config.AppConfig
-import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.http.newCallResponse
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.help.http.text
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
-import io.legado.app.utils.fromJsonObject
 import kotlinx.coroutines.CoroutineScope
 
+/**
+ * 检查更新：GitHub Releases（本仓库 xindi524/legado-sigma）
+ * 约定：Release 正文（body）首行形如 "version: 3.26.110701"，
+ * 与包内 versionName 按（同长度数字段）字典序比较判断新版本。
+ */
 @Keep
-@Suppress("unused")
 object AppUpdateGitee : AppUpdate.AppUpdateInterface {
 
-    private val checkVariant: AppVariant
-        get() = when (AppConfig.updateToVariant) {
-            "official_version" -> AppVariant.OFFICIAL
-            "beta_release_version" -> AppVariant.BETA_RELEASE
-            "beta_releaseA_version" -> AppVariant.BETA_RELEASEA
-            "beta_releaseS_version" -> AppVariant.BETA_RELEASES
-            else -> AppConst.appInfo.appVariant
-        }
+    private const val RELEASE_API =
+        "https://api.github.com/repos/xindi524/legado-sigma/releases?per_page=5"
 
-    private suspend fun getLatestRelease(): List<AppReleaseInfo> {
-        val lastReleaseUrl = if (checkVariant.isBeta()) {
-            "https://gitee.com/api/v5/repos/lyc486/legado/releases/latest"
-        } else {
-            "https://gitee.com/api/v5/repos/lyc486/legado/releases?page=1&per_page=3&direction=desc"
-        }
+    private data class GhAsset(val name: String?, val browser_download_url: String?)
+    private data class GhRelease(
+        val tag_name: String?,
+        val name: String?,
+        val body: String?,
+        val prerelease: Boolean = false,
+        val assets: List<GhAsset> = emptyList()
+    )
+
+    private fun parseVersion(body: String?): String? {
+        // 从 Release 正文提取 "version: x.y.zzzz" 行
+        body?.lineSequence()?.firstOrNull { it.trim().startsWith("version:", true) }
+            ?.let { line ->
+                return line.substringAfter(":", "").trim().takeIf { it.isNotEmpty() }
+            }
+        return null
+    }
+
+    private suspend fun getLatestRelease(): AppUpdate.UpdateInfo {
         val res = okHttpClient.newCallResponse {
-            url(lastReleaseUrl)
+            url(RELEASE_API)
         }
         if (!res.isSuccessful) {
             throw NoStackTraceException("获取新版本出错(${res.code})")
@@ -42,21 +50,25 @@ object AppUpdateGitee : AppUpdate.AppUpdateInterface {
         if (body.isBlank()) {
             throw NoStackTraceException("获取新版本出错")
         }
-        if (!checkVariant.isBeta()) {
-            return GSON.fromJsonArray<GiteeRelease>(body)
-                .getOrElse {
-                    throw NoStackTraceException("获取新版本出错 " + it.localizedMessage)
-                }
-                .first { !it.prerelease }
-                .gitReleaseToAppReleaseInfo()
-                .sortedByDescending { it.createdAt }
-        }
-        return GSON.fromJsonObject<GiteeRelease>(body)
+        val releases = GSON.fromJsonArray<GhRelease>(body)
             .getOrElse {
                 throw NoStackTraceException("获取新版本出错 " + it.localizedMessage)
             }
-            .gitReleaseToAppReleaseInfo()
-            .sortedByDescending { it.createdAt }
+        for (release in releases) {
+            // 优先取 apk 附件，跳过无附件的发布
+            val apkUrl = release.assets
+                .firstOrNull { it.browser_download_url?.endsWith(".apk") == true }
+                ?.browser_download_url ?: continue
+            val versionName = parseVersion(release.body) ?: release.tag_name?.removePrefix("v")
+            ?: continue
+            return AppUpdate.UpdateInfo(
+                versionName,
+                release.body ?: "",
+                apkUrl,
+                release.name ?: release.tag_name ?: "阅读deep"
+            )
+        }
+        throw NoStackTraceException("获取新版本出错")
     }
 
     override fun check(
@@ -64,14 +76,7 @@ object AppUpdateGitee : AppUpdate.AppUpdateInterface {
     ): Coroutine<AppUpdate.UpdateInfo> {
         return Coroutine.async(scope) {
             getLatestRelease()
-                .filter {
-                    if (AppConst.appInfo.appVariant == AppVariant.BETA_RELEASE) { //不切版本
-                        it.appVariant == AppConst.appInfo.appVariant
-                    } else {
-                        it.appVariant == checkVariant
-                    }
-                }
-                .firstOrNull { it.versionName > AppConst.appInfo.versionName }
+                .takeIf { it.versionName > AppConst.appInfo.versionName }
                 ?.let {
                     return@async AppUpdate.UpdateInfo(
                         it.versionName,
