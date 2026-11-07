@@ -239,13 +239,17 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
      */
     private suspend fun upVersion() = suspendCancellableCoroutine sc@{ block ->
         if (LocalConfig.versionCode == appInfo.versionCode) {
-            // deep：每次启动都检查更新，检测到新版本直接弹窗（不受开关与间隔限制）
-            AppUpdate.giteeUpdate.check(lifecycleScope)
-                .onSuccess {
-                    showDialogFragment(
-                        UpdateDialog(it)
-                    )
+            if (AppConfig.autoUpdateVariant) {
+                if (LocalConfig.lastCheckUpdate + 24.hours.inWholeMilliseconds < System.currentTimeMillis()) {
+                    AppUpdate.giteeUpdate.check(lifecycleScope)
+                        .onSuccess {
+                            showDialogFragment(
+                                UpdateDialog(it)
+                            )
+                        }
+                    LocalConfig.lastCheckUpdate = System.currentTimeMillis()
                 }
+            }
             block.resume(null)
             return@sc
         }
