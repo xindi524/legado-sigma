@@ -120,8 +120,6 @@ https://www.yuque.com/legado/wiki/community
 
 **项目实现中参考借鉴了以下开源项目的思路与设计，一并致谢**：
 > * [Legado](https://github.com/gedoor/legado)：原版开源阅读，本项目的根基
-> * [清墨 Light-Ink](http://lightink.zhendong.ltd/)：云端书库（网盘开放平台接入）实现参考
-> * [Readingo](http://ismyway.com/)：云端书库搜索与文件管理交互参考
 <a href="#readme">
     <img src="https://img.shields.io/badge/-返回顶部-orange.svg" alt="#" align="right">
 </a>
