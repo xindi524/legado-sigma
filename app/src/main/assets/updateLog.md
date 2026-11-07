@@ -87,12 +87,11 @@
 
 
 ## **必读**
-来源于fork仓库 [Luoyacheng/legado-E](https://github.com/Luoyacheng/legado-E)　  
-[查看实时详细日志](https://gitee.com/lyc486/legado/commits/main)　 
+阅读deep基于开源阅读 Legado 深度增强，开源地址：https://github.com/xindi524/legado-sigma　  
+[下载最新版本](https://github.com/xindi524/legado-sigma/releases)　 
 
 【温馨提醒】 *更新前一定要做好备份，以免数据丢失！*  
 * 阅读只是一个转码工具，不提供内容，第一次安装app，需要自己手动导入书源。
 * 正文出现缺字漏字、内容缺失、排版错乱等情况，有可能是净化规则或简繁转换出现问题。
 ----
 
-* [2025年日志](https://github.com/Luoyacheng/legado-E/blob/record2025/app/src/main/assets/updateLog.md)　
