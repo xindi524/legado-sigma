@@ -76,15 +76,11 @@ object AppUpdateGitee : AppUpdate.AppUpdateInterface {
         scope: CoroutineScope,
     ): Coroutine<AppUpdate.UpdateInfo> {
         return Coroutine.async(scope) {
+            // UpdateInfo.tagName 实际承载 versionName（与原实现一致的占位用法）
             getLatestRelease()
-                .takeIf { it.versionName > AppConst.appInfo.versionName }
-                ?.let {
-                    return@async AppUpdate.UpdateInfo(
-                        it.versionName,
-                        it.note,
-                        it.downloadUrl,
-                        it.name
-                    )
+                .takeIf { it.tagName > AppConst.appInfo.versionName }
+                ?.let { info ->
+                    return@async info
                 }
             throw NoStackTraceException("已是最新版本")
         }.timeout(10000)
