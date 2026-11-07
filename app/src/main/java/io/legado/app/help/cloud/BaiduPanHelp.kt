@@ -311,7 +311,7 @@ object BaiduPanHelp {
     }
 
     /**
-     * 服务端语义搜索（Readingo 同款 unisearch 接口，瞬时返回全盘匹配）
+     * 服务端语义搜索（unisearch 接口，瞬时返回全盘匹配）
      * POST /xpan/unisearch?access_token=..&scene=mcpserver&query=..&search_type=1&num=20，body 为 "{}"
      * 响应 data[].list[] 内含 path/size/fsid/filename，可直接用于下载
      */
