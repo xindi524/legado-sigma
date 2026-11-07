@@ -134,7 +134,7 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
 
     /**
      * 搜索链路（速度优先）：①索引内存过滤（<10ms，最常见路径）
-     * ②服务端语义搜索（索引缺失/过期时，Readingo 同款）
+     * ②服务端语义搜索（索引缺失/过期时的服务端兜底）
      * ③本地递归兜底。全部结果按匹配度由高到低排序
      * 精确=子序列（可缺字漏字有间隔，不能错字乱序）；模糊=≥50%字符命中
      */
