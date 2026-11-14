@@ -1,72 +1,121 @@
 package io.legado.app.help
 
-import android.content.Context
+import android.annotation.SuppressLint
 import android.net.Uri
+import android.webkit.JavascriptInterface
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.model.localBook.LocalBook
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import com.tom_roush.pdfbox.pdmodel.PDDocument
-import com.tom_roush.pdfbox.text.PDFTextStripper
-import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
+import kotlinx.coroutines.withTimeout
 import splitties.init.appCtx
+import java.io.File
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /**
- * F7：PDF 转 TXT
- * 使用 Apache PDFBox (pdfbox-android, Apache-2.0) 提取文字层内容，
- * 逐页提取后以空行分隔，转换结果保存到书籍保存位置并返回 TXT 的 Uri。
- * 扫描版（无文字层）PDF 会抛出明确错误提示。
+ * F7：PDF 转 TXT（pdf.js / WebView 方案）
+ * 无 native 依赖、无许可风险。PDF 复制到缓存后由 WebView 内的 pdf.js 逐页提取文字，
+ * 页与页之间以空行分隔，结果保存到书籍保存位置并返回 TXT 的 Uri。
+ * 扫描版（无文字层）PDF 提取结果为空，会抛出明确错误提示。
  */
 object PdfConverter {
 
-    @Volatile
-    private var inited = false
+    private const val TIMEOUT_MS = 180_000L
 
-    private fun ensureInit() {
-        if (!inited) {
-            synchronized(this) {
-                if (!inited) {
-                    PDFBoxResourceLoader.init(appCtx)
-                    inited = true
-                }
-            }
-        }
+    private class Bridge(
+        private val onInfo: (Int) -> Unit,
+        private val onPage: (Int, Int, String) -> Unit,
+        private val onDone: (String?) -> Unit
+    ) {
+        @JavascriptInterface
+        fun onInfo(total: Int) = onInfo(total)
+
+        @JavascriptInterface
+        fun onPage(page: Int, total: Int, text: String) = onPage(page, total, text)
+
+        @JavascriptInterface
+        fun onDone(error: String?) = onDone(error)
     }
 
     /**
      * 将 PDF 转为 TXT 并保存到书籍保存位置，返回 TXT 的 Uri。
      * fileName 为原始 PDF 文件名（含 .pdf 后缀），输出同名 .txt。
      */
-    suspend fun convertToTxt(pdfUri: Uri, fileName: String): Uri = withContext(Dispatchers.IO) {
-        ensureInit()
+    suspend fun convertToTxt(pdfUri: Uri, fileName: String): Uri {
         val text = extractText(pdfUri)
         if (text.trim().length < 20) {
             throw NoStackTraceException("该 PDF 没有可提取的文字内容（可能为扫描版/图片版），暂不支持转换")
         }
         val txtName = fileName.removeSuffix(".pdf").removeSuffix(".PDF") + ".txt"
-        LocalBook.saveBookFile(text, txtName)
+        return LocalBook.saveBookFile(text, txtName)
     }
 
     /**
      * 提取 PDF 全部文字，页与页之间以空行分隔
      */
-    fun extractText(pdfUri: Uri): String {
-        ensureInit()
-        val context: Context = appCtx
-        PDDocument.load(context.contentResolver.openInputStream(pdfUri)!!).use { doc ->
-            val sb = StringBuilder()
-            val stripper = PDFTextStripper()
-            stripper.sortByPosition = true
-            val pages = doc.numberOfPages
-            for (page in 1..pages) {
-                stripper.startPage = page
-                stripper.endPage = page
-                sb.append(stripper.getText(doc))
-                if (page < pages) {
-                    sb.append("\n\n")
+    suspend fun extractText(pdfUri: Uri): String = withTimeout(TIMEOUT_MS) {
+        // 1) PDF 复制到缓存，供 WebView 内 pdf.js 读取
+        val tmpPdf = withContext(Dispatchers.IO) {
+            val f = File(appCtx.cacheDir, "pdf2txt_tmp.pdf")
+            appCtx.contentResolver.openInputStream(pdfUri)!!.use { input ->
+                f.outputStream().use { output -> input.copyTo(output) }
+            }
+            f
+        }
+        try {
+            // 2) WebView（主线程创建）加载提取页
+            withContext(Dispatchers.Main) {
+                suspendCancellableCoroutine { cont ->
+                    val sb = StringBuilder()
+                    val webView = createWebView(
+                        onInfo = { },
+                        onPage = { _, _, text -> sb.append(text).append("\n\n") },
+                        onDone = { error ->
+                            webView.post {
+                                webView.destroy()
+                                if (cont.isActive) {
+                                    if (error.isNullOrBlank()) cont.resume(sb.toString())
+                                    else cont.resumeWithException(
+                                        NoStackTraceException("PDF 转换失败：$error")
+                                    )
+                                }
+                            }
+                        }
+                    )
+                    webView.webViewClient = object : WebViewClient() {
+                        override fun onPageFinished(view: WebView, url: String) {
+                            view.evaluateJavascript(
+                                "startExtract('file://${tmpPdf.absolutePath}')", null
+                            )
+                        }
+                    }
+                    webView.loadUrl("file:///android_asset/pdf2txt/index.html")
+                    cont.invokeOnCancellation { webView.post { webView.destroy() } }
                 }
             }
-            return sb.toString()
+        } finally {
+            tmpPdf.delete()
         }
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun createWebView(
+        onInfo: (Int) -> Unit,
+        onPage: (Int, Int, String) -> Unit,
+        onDone: (String?) -> Unit
+    ): WebView {
+        val webView = WebView(appCtx)
+        webView.settings.javaScriptEnabled = true
+        webView.settings.allowFileAccess = true
+        webView.settings.allowFileAccessFromFileURLs = true
+        webView.settings.allowUniversalAccessFromFileURLs = true
+        webView.addJavascriptInterface(
+            Bridge(onInfo, onPage, onDone), "AndroidBridge"
+        )
+        return webView
     }
 }
