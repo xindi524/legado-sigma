@@ -29,6 +29,7 @@ object PdfConverter {
     private class Bridge(
         private val onInfoCb: (Int) -> Unit,
         private val onPageCb: (Int, Int, String) -> Unit,
+        private val onCoverCb: (String) -> Unit,
         private val onDoneCb: (String?) -> Unit
     ) {
         @JavascriptInterface
@@ -38,26 +39,41 @@ object PdfConverter {
         fun onPage(page: Int, total: Int, text: String) = onPageCb(page, total, text)
 
         @JavascriptInterface
+        fun onCover(dataUrl: String) = onCoverCb(dataUrl)
+
+        @JavascriptInterface
         fun onDone(error: String?) = onDoneCb(error)
     }
 
     /**
      * 将 PDF 转为 TXT 并保存到书籍保存位置，返回 TXT 的 Uri。
      * fileName 为原始 PDF 文件名（含 .pdf 后缀），输出同名 .txt。
+     * coverOut 非空时，把 PDF 第一页渲染的 jpeg 写入该文件作为封面。
      */
-    suspend fun convertToTxt(pdfUri: Uri, fileName: String): Uri {
-        val text = extractText(pdfUri)
+    suspend fun convertToTxt(pdfUri: Uri, fileName: String, coverOut: File? = null): Uri {
+        var coverBytes: ByteArray? = null
+        val text = extractText(pdfUri) { coverBytes = it }
         if (text.trim().length < 20) {
             throw NoStackTraceException("该 PDF 没有可提取的文字内容（可能为扫描版/图片版），暂不支持转换")
         }
         val txtName = fileName.removeSuffix(".pdf").removeSuffix(".PDF") + ".txt"
-        return LocalBook.saveBookFile(text.byteInputStream(), txtName)
+        val uri = LocalBook.saveBookFile(text.byteInputStream(), txtName)
+        coverBytes?.let { bytes ->
+            coverOut?.let { out ->
+                withContext(Dispatchers.IO) {
+                    out.parentFile?.mkdirs()
+                    out.outputStream().use { it.write(bytes) }
+                }
+            }
+        }
+        return uri
     }
 
     /**
-     * 提取 PDF 全部文字，页与页之间以空行分隔
+     * 提取 PDF 全部文字，页与页之间以空行分隔。
+     * onCover 回传第一页渲染的 jpeg 字节（可能为空）。
      */
-    suspend fun extractText(pdfUri: Uri): String = withTimeout(TIMEOUT_MS) {
+    suspend fun extractText(pdfUri: Uri, onCover: (ByteArray?) -> Unit = {}): Pair<String, ByteArray?> = withTimeout(TIMEOUT_MS) {
         // 1) PDF 复制到缓存，供 WebView 内 pdf.js 读取
         val tmpPdf = withContext(Dispatchers.IO) {
             val f = File(appCtx.cacheDir, "pdf2txt_tmp.pdf")
@@ -72,16 +88,19 @@ object PdfConverter {
                 suspendCancellableCoroutine { cont ->
                     val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
                     val sb = StringBuilder()
+                    var coverDataUrl: String? = null
                     var webViewRef: WebView? = null
                     val bridge = Bridge(
                         onInfoCb = { },
                         onPageCb = { _, _, text -> sb.append(text).append("\n\n") },
+                        onCoverCb = { dataUrl -> coverDataUrl = dataUrl },
                         onDoneCb = { error ->
                             mainHandler.post {
                                 webViewRef?.destroy()
                                 if (cont.isActive) {
-                                    if (error.isNullOrBlank()) cont.resume(sb.toString())
-                                    else cont.resumeWithException(
+                                    if (error.isNullOrBlank()) {
+                                        cont.resume(sb.toString() to decodeCover(coverDataUrl))
+                                    } else cont.resumeWithException(
                                         NoStackTraceException("PDF 转换失败：$error")
                                     )
                                 }
@@ -117,6 +136,14 @@ object PdfConverter {
         } finally {
             tmpPdf.delete()
         }
+    }
+
+    private fun decodeCover(dataUrl: String?): ByteArray? {
+        val prefix = "data:image/jpeg;base64,"
+        if (dataUrl.isNullOrEmpty() || !dataUrl.startsWith(prefix)) return null
+        return runCatching {
+            android.util.Base64.decode(dataUrl.substring(prefix.length), android.util.Base64.DEFAULT)
+        }.getOrNull()
     }
 
     @SuppressLint("SetJavaScriptEnabled")
