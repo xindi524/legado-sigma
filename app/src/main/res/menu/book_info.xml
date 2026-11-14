@@ -88,4 +88,9 @@
         android:title="@string/log"
         app:showAsAction="never" />
 
+    <item
+        android:id="@+id/menu_convert_txt"
+        android:title="转为TXT"
+        app:showAsAction="never" />
+
 </menu>
