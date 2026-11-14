@@ -8,21 +8,16 @@
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdf.worker.min.js';
 
-async function extract(url) {
+// PDF 数据由 Android 侧以 base64 分块注入到该数组
+window.PDF_B64_CHUNKS = [];
+
+async function startExtractFromChunks() {
     try {
-        // XHR 读取本地 PDF（allowFileAccessFromFileURLs 已开启）
-        const buf = await new Promise(function (resolve, reject) {
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', url, true);
-            xhr.responseType = 'arraybuffer';
-            xhr.onload = function () {
-                if (xhr.status === 0 || xhr.status === 200) resolve(xhr.response);
-                else reject(new Error('HTTP ' + xhr.status));
-            };
-            xhr.onerror = function () { reject(new Error('读取文件失败')); };
-            xhr.send();
-        });
-        const doc = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+        const b64 = window.PDF_B64_CHUNKS.join('');
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
         const total = doc.numPages;
         AndroidBridge.onInfo(total);
         for (let p = 1; p <= total; p++) {
