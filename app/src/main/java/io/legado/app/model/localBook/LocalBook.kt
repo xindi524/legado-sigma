@@ -248,16 +248,6 @@ object LocalBook {
 
             bookUrl = toString()
         }
-        // F7: PDF 文件先转 TXT 再导入（转换结果存书籍保存位置）
-        if (fileName.endsWith(".pdf", true)) {
-            val txtUri = runCatching {
-                PdfConverter.convertToTxt(uri, fileName)
-            }.getOrElse {
-                throw if (it is NoStackTraceException) it
-                else NoStackTraceException("PDF 转换失败：${it.localizedMessage}")
-            }
-            return importFile(txtUri)
-        }
         var book = appDb.bookDao.getBook(bookUrl)
         if (book == null) {
             val nameAuthor = analyzeNameAuthor(fileName)
