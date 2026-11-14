@@ -27,18 +27,18 @@ object PdfConverter {
     private const val TIMEOUT_MS = 180_000L
 
     private class Bridge(
-        private val onInfo: (Int) -> Unit,
-        private val onPage: (Int, Int, String) -> Unit,
-        private val onDone: (String?) -> Unit
+        private val onInfoCb: (Int) -> Unit,
+        private val onPageCb: (Int, Int, String) -> Unit,
+        private val onDoneCb: (String?) -> Unit
     ) {
         @JavascriptInterface
-        fun onInfo(total: Int) = onInfo(total)
+        fun onInfo(total: Int) = onInfoCb(total)
 
         @JavascriptInterface
-        fun onPage(page: Int, total: Int, text: String) = onPage(page, total, text)
+        fun onPage(page: Int, total: Int, text: String) = onPageCb(page, total, text)
 
         @JavascriptInterface
-        fun onDone(error: String?) = onDone(error)
+        fun onDone(error: String?) = onDoneCb(error)
     }
 
     /**
@@ -70,13 +70,15 @@ object PdfConverter {
             // 2) WebView（主线程创建）加载提取页
             withContext(Dispatchers.Main) {
                 suspendCancellableCoroutine { cont ->
+                    val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
                     val sb = StringBuilder()
-                    val webView = createWebView(
-                        onInfo = { },
-                        onPage = { _, _, text -> sb.append(text).append("\n\n") },
-                        onDone = { error ->
-                            webView.post {
-                                webView.destroy()
+                    lateinit var webView: WebView
+                    val bridge = Bridge(
+                        onInfoCb = { },
+                        onPageCb = { _, _, text -> sb.append(text).append("\n\n") },
+                        onDoneCb = { error ->
+                            mainHandler.post {
+                                if (::webView.isInitialized) webView.destroy()
                                 if (cont.isActive) {
                                     if (error.isNullOrBlank()) cont.resume(sb.toString())
                                     else cont.resumeWithException(
@@ -86,6 +88,7 @@ object PdfConverter {
                             }
                         }
                     )
+                    webView = createWebView(bridge)
                     webView.webViewClient = object : WebViewClient() {
                         override fun onPageFinished(view: WebView, url: String) {
                             view.evaluateJavascript(
@@ -94,7 +97,11 @@ object PdfConverter {
                         }
                     }
                     webView.loadUrl("file:///android_asset/pdf2txt/index.html")
-                    cont.invokeOnCancellation { webView.post { webView.destroy() } }
+                    cont.invokeOnCancellation {
+                        mainHandler.post {
+                            if (::webView.isInitialized) webView.destroy()
+                        }
+                    }
                 }
             }
         } finally {
@@ -103,19 +110,13 @@ object PdfConverter {
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private fun createWebView(
-        onInfo: (Int) -> Unit,
-        onPage: (Int, Int, String) -> Unit,
-        onDone: (String?) -> Unit
-    ): WebView {
+    private fun createWebView(bridge: Bridge): WebView {
         val webView = WebView(appCtx)
         webView.settings.javaScriptEnabled = true
         webView.settings.allowFileAccess = true
         webView.settings.allowFileAccessFromFileURLs = true
         webView.settings.allowUniversalAccessFromFileURLs = true
-        webView.addJavascriptInterface(
-            Bridge(onInfo, onPage, onDone), "AndroidBridge"
-        )
+        webView.addJavascriptInterface(bridge, "AndroidBridge")
         return webView
     }
 }
