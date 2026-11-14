@@ -280,10 +280,10 @@ class BookInfoActivity :
         menu.findItem(R.id.menu_upload)?.isVisible =
             viewModel.bookData.value?.isLocal ?: false
         // F7: 仅本地 PDF 书显示"转为TXT"
-        menu.findItem(R.id.menu_convert_txt)?.isVisible = run {
-            val b = viewModel.bookData.value
-            b != null && b.isLocal && (b.bookUrl.endsWith(".pdf", true) || b.originName.endsWith(".pdf", true))
-        }
+        val infoBook = viewModel.bookData.value
+        menu.findItem(R.id.menu_convert_txt)?.isVisible = infoBook != null &&
+            infoBook.isLocal &&
+            (infoBook.bookUrl.endsWith(".pdf", true) || infoBook.originName.endsWith(".pdf", true))
         menu.findItem(R.id.menu_delete_alert)?.isChecked =
             LocalConfig.bookInfoDeleteAlert
         return super.onMenuOpened(featureId, menu)
@@ -301,11 +301,10 @@ class BookInfoActivity :
             }
             try {
                 val txtUri = PdfConverter.convertToTxt(b.bookUrl.toUri(), b.originName)
-                withContext(Dispatchers.IO) {
+                withContext(IO) {
                     LocalBook.importFile(txtUri)
                 }
-                toastOnUi("已转换为 TXT 并加入书架")
-                initBookData()
+                toastOnUi("已转换为 TXT 并加入书架，原 PDF 书可手动删除")
             } catch (e: Exception) {
                 toastOnUi(e.message ?: "转换失败")
             } finally {
