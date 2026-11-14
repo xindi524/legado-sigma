@@ -16,6 +16,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.exception.EmptyFileException
 import io.legado.app.exception.NoBooksDirException
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.help.PdfConverter
 import io.legado.app.exception.TocEmptyException
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.book.BookHelp
@@ -246,6 +247,16 @@ object LocalBook {
             if (size == 0L) throw EmptyFileException("Unexpected empty File")
 
             bookUrl = toString()
+        }
+        // F7: PDF 文件先转 TXT 再导入（转换结果存书籍保存位置）
+        if (fileName.endsWith(".pdf", true)) {
+            val txtUri = runCatching {
+                PdfConverter.convertToTxt(uri, fileName)
+            }.getOrElse {
+                throw if (it is NoStackTraceException) it
+                else NoStackTraceException("PDF 转换失败：${it.localizedMessage}")
+            }
+            return importFile(txtUri)
         }
         var book = appDb.bookDao.getBook(bookUrl)
         if (book == null) {
