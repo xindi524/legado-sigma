@@ -252,8 +252,8 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
             refresh()
             return
         }
-        if (!file.name.endsWith(".txt", true) && !file.name.endsWith(".epub", true)) {
-            toastOnUi("仅支持导入 TXT / EPUB 文件")
+        if (!file.name.endsWith(".txt", true) && !file.name.endsWith(".epub", true) && !file.name.endsWith(".pdf", true)) {
+            toastOnUi("仅支持导入 TXT / EPUB / PDF 文件")
             return
         }
         // 未设置书籍保存位置：仿导入本地书籍的设计弹窗引导授权
@@ -277,7 +277,7 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
         alert("下载并导入") {
             setMessage(
                 "「${file.name}」（${formatSize(file.size)}）\n\n" +
-                    "将保存到「书籍保存位置」设定的文件夹（设置→其他可修改），网盘原件不受影响。"
+                    "将保存到「书籍保存位置」设定的文件夹（设置→其他可修改），网盘原件不受影响。PDF 文件会自动转换为 TXT 后导入。"
             )
             positiveButton("下载") {
                 CloudDownloadManager.start(file)
