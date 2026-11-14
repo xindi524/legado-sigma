@@ -293,7 +293,10 @@ class BookInfoActivity :
      * F7: 将本地 PDF 书转换为 TXT 并加入书架（原 PDF 书保留，可手动删除）
      */
     private fun convertPdfToTxt() {
-        val b = book
+        val b = book ?: run {
+            toastOnUi("书籍信息未加载")
+            return
+        }
         lifecycleScope.launch {
             val waitDialog = WaitDialog(this@BookInfoActivity).apply {
                 show()
