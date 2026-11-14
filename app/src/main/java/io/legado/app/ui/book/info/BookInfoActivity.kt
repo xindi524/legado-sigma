@@ -29,6 +29,7 @@ import io.legado.app.constant.BookType
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.Theme
 import io.legado.app.data.appDb
+import java.io.File
 import io.legado.app.data.entities.BaseSource
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
@@ -303,16 +304,24 @@ class BookInfoActivity :
                 setText("正在转换 PDF…")
             }
             try {
-                val txtUri = PdfConverter.convertToTxt(b.bookUrl.toUri(), b.originName)
+                val coverFile = File(this@BookInfoActivity.filesDir, "covers/${b.name}.jpg")
+                val txtUri = PdfConverter.convertToTxt(b.bookUrl.toUri(), b.originName, coverFile)
                 val txtBook = withContext(IO) {
-                    LocalBook.importFile(txtUri)
-                }
-                alert("转换完成", "TXT《${txtBook.name}》已加入书架。\n\n原 PDF 书《${b.name}》要保留在书架上吗？（PDF 文件本身会始终保留）") {
-                    positiveButton("保留") { }
-                    negativeButton("删除") {
-                        LocalBook.deleteBook(b, false)
-                        toastOnUi("已从书架删除 PDF 书")
+                    val tb = LocalBook.importFile(txtUri)
+                    // PDF 第一页渲染图作为 TXT 书封面
+                    if (coverFile.exists()) {
+                        tb.coverUrl = coverFile.absolutePath
+                        appDb.bookDao.update(tb)
                     }
+                    tb
+                }
+                alert("转换完成") {
+                    setMessage(
+                        "TXT《${txtBook.name}》已生成并加入书架，封面同步自 PDF 第一页。\n\n" +
+                            "提示：当前版本书架同名书籍会互相替换，PDF 书已被 TXT 版取代；" +
+                            "PDF 原文件仍保留在书籍保存位置。"
+                    )
+                    positiveButton("知道了") { }
                 }
             } catch (e: Exception) {
                 toastOnUi(e.message ?: "转换失败")
