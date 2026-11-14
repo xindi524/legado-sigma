@@ -72,13 +72,13 @@ object PdfConverter {
                 suspendCancellableCoroutine { cont ->
                     val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
                     val sb = StringBuilder()
-                    lateinit var webView: WebView
+                    var webViewRef: WebView? = null
                     val bridge = Bridge(
                         onInfoCb = { },
                         onPageCb = { _, _, text -> sb.append(text).append("\n\n") },
                         onDoneCb = { error ->
                             mainHandler.post {
-                                if (::webView.isInitialized) webView.destroy()
+                                webViewRef?.destroy()
                                 if (cont.isActive) {
                                     if (error.isNullOrBlank()) cont.resume(sb.toString())
                                     else cont.resumeWithException(
@@ -88,7 +88,8 @@ object PdfConverter {
                             }
                         }
                     )
-                    webView = createWebView(bridge)
+                    val webView = createWebView(bridge)
+                    webViewRef = webView
                     webView.webViewClient = object : WebViewClient() {
                         override fun onPageFinished(view: WebView, url: String) {
                             view.evaluateJavascript(
@@ -98,9 +99,7 @@ object PdfConverter {
                     }
                     webView.loadUrl("file:///android_asset/pdf2txt/index.html")
                     cont.invokeOnCancellation {
-                        mainHandler.post {
-                            if (::webView.isInitialized) webView.destroy()
-                        }
+                        mainHandler.post { webViewRef?.destroy() }
                     }
                 }
             }
