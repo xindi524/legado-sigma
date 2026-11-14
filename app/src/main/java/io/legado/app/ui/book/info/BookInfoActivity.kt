@@ -35,11 +35,14 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.databinding.ActivityBookInfoBinding
 import io.legado.app.exception.NoStackTraceException
+import androidx.core.net.toUri
 import io.legado.app.help.AppWebDav
+import io.legado.app.help.PdfConverter
 import io.legado.app.help.GlideImageGetter
 import io.legado.app.help.TextViewTagHandler
 import io.legado.app.help.WebCacheManager
 import io.legado.app.help.book.addType
+import io.legado.app.model.localBook.LocalBook
 import io.legado.app.help.book.getRemoteUrl
 import io.legado.app.help.book.isAudio
 import io.legado.app.help.book.isImage
@@ -276,13 +279,45 @@ class BookInfoActivity :
             viewModel.bookData.value?.isLocalTxt ?: false
         menu.findItem(R.id.menu_upload)?.isVisible =
             viewModel.bookData.value?.isLocal ?: false
+        // F7: 仅本地 PDF 书显示"转为TXT"
+        menu.findItem(R.id.menu_convert_txt)?.isVisible = run {
+            val b = viewModel.bookData.value
+            b != null && b.isLocal && (b.bookUrl.endsWith(".pdf", true) || b.originName.endsWith(".pdf", true))
+        }
         menu.findItem(R.id.menu_delete_alert)?.isChecked =
             LocalConfig.bookInfoDeleteAlert
         return super.onMenuOpened(featureId, menu)
     }
 
+    /**
+     * F7: 将本地 PDF 书转换为 TXT 并加入书架（原 PDF 书保留，可手动删除）
+     */
+    private fun convertPdfToTxt() {
+        val b = book
+        lifecycleScope.launch {
+            val waitDialog = WaitDialog(this@BookInfoActivity).apply {
+                show()
+                setText("正在转换 PDF…")
+            }
+            try {
+                val txtUri = PdfConverter.convertToTxt(b.bookUrl.toUri(), b.originName)
+                withContext(Dispatchers.IO) {
+                    LocalBook.importFile(txtUri)
+                }
+                toastOnUi("已转换为 TXT 并加入书架")
+                initBookData()
+            } catch (e: Exception) {
+                toastOnUi(e.message ?: "转换失败")
+            } finally {
+                waitDialog.dismiss()
+            }
+        }
+    }
+
     override fun onCompatOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
+            R.id.menu_convert_txt -> convertPdfToTxt()
+
             R.id.menu_custom_btn -> {
                 viewModel.bookSource?.customButton?.let {
                     viewModel.getBook()?.let { book ->
