@@ -277,7 +277,7 @@ class CloudLibraryActivity : BaseActivity<ActivityCloudLibraryBinding>(),
         alert("下载并导入") {
             setMessage(
                 "「${file.name}」（${formatSize(file.size)}）\n\n" +
-                    "将保存到「书籍保存位置」设定的文件夹（设置→其他可修改），网盘原件不受影响。PDF 文件会自动转换为 TXT 后导入。"
+                    "将保存到「书籍保存位置」设定的文件夹（设置→其他可修改），网盘原件不受影响。PDF 导入后可在书籍详情页手动转换为 TXT。"
             )
             positiveButton("下载") {
                 CloudDownloadManager.start(file)
