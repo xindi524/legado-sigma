@@ -18,25 +18,80 @@ async function startExtractFromChunks() {
         const bytes = new Uint8Array(bin.length);
         for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
         const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
-        const total = doc.numPages;
-        AndroidBridge.onInfo(total);
-        for (let p = 1; p <= total; p++) {
+        AndroidBridge.onInfo(doc.numPages);
+        // 封面：第一页渲染为 jpeg
+        try {
+            AndroidBridge.onCover(await renderCover(doc));
+        } catch (e) { /* 封面失败不影响正文 */ }
+        for (let p = 1; p <= doc.numPages; p++) {
             const page = await doc.getPage(p);
             const tc = await page.getTextContent();
-            let s = '', lastY = null;
-            for (const item of tc.items) {
-                const y = item.transform[5];
-                if (lastY !== null && Math.abs(y - lastY) > 2 && !s.endsWith('\n')) s += '\n';
-                s += item.str;
-                if (item.hasEOL) { s += '\n'; lastY = null; }
-                else lastY = y;
-            }
-            AndroidBridge.onPage(p, total, s);
+            AndroidBridge.onPage(p, doc.numPages, itemsToText(tc.items));
         }
         AndroidBridge.onDone('');
     } catch (e) {
         AndroidBridge.onDone(String(e && e.message || e));
     }
+}
+
+// 第一页渲染为封面 jpeg dataURL
+async function renderCover(doc) {
+    const page = await doc.getPage(1);
+    const vp1 = page.getViewport({ scale: 1 });
+    const viewport = page.getViewport({ scale: 600 / vp1.width });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(viewport.width);
+    canvas.height = Math.round(viewport.height);
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    return canvas.toDataURL('image/jpeg', 0.85);
+}
+
+// items → 行（按 y 归组、行内按 x 排序）→ 按行距与首行缩进判定分段
+function itemsToText(items) {
+    // 1) 合并成行
+    const lines = [];
+    let cur = null;
+    for (const it of items) {
+        const x = it.transform[4], y = it.transform[5];
+        const size = Math.abs(it.transform[3]) || Math.abs(it.transform[0]) || 12;
+        if (cur && Math.abs(cur.y - y) <= Math.max(2, cur.size * 0.5)) {
+            cur.text += it.str;
+            cur.size = Math.max(cur.size, size);
+            if (it.hasEOL) cur.eol = true;
+        } else {
+            if (cur) lines.push(cur);
+            cur = { x: x, y: y, size: size, text: it.str, eol: !!it.hasEOL };
+        }
+    }
+    if (cur) lines.push(cur);
+    if (lines.length === 0) return '';
+
+    // 2) 正文左边界（最小行起点）与基准行距（相邻行 y 差的中位数）
+    let minX = Infinity;
+    for (const ln of lines) minX = Math.min(minX, ln.x);
+    const diffs = [];
+    for (let i = 1; i < lines.length; i++) {
+        const dy = lines[i - 1].y - lines[i].y;
+        if (dy > 1) diffs.push(dy);
+    }
+    diffs.sort(function (a, b) { return a - b; });
+    const medianDy = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 0;
+
+    // 3) 行 → 文本：新段 = 行距超基准1.6倍 或 行首明显缩进
+    let out = '';
+    let prev = null;
+    for (const ln of lines) {
+        if (prev !== null) {
+            const dy = prev.y - ln.y;
+            const indent = ln.x - minX;
+            const isPara = (medianDy > 0 && dy > medianDy * 1.6) ||
+                (indent > ln.size * 1.2 && ln.x > prev.x);
+            out += isPara ? '\n\n' : '\n';
+        }
+        out += ln.text;
+        prev = ln;
+    }
+    return out;
 }
 </script>
 </body>
