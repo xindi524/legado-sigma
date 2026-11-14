@@ -51,7 +51,7 @@ object PdfConverter {
             throw NoStackTraceException("该 PDF 没有可提取的文字内容（可能为扫描版/图片版），暂不支持转换")
         }
         val txtName = fileName.removeSuffix(".pdf").removeSuffix(".PDF") + ".txt"
-        return LocalBook.saveBookFile(text, txtName)
+        return LocalBook.saveBookFile(text.byteInputStream(), txtName)
     }
 
     /**
