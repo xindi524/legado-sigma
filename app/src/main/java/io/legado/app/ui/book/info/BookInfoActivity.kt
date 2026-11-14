@@ -280,10 +280,10 @@ class BookInfoActivity :
         menu.findItem(R.id.menu_upload)?.isVisible =
             viewModel.bookData.value?.isLocal ?: false
         // F7: 仅本地 PDF 书显示"转为TXT"
-        val infoBook = viewModel.bookData.value
-        menu.findItem(R.id.menu_convert_txt)?.isVisible = infoBook != null &&
-            infoBook.isLocal &&
-            (infoBook.bookUrl.endsWith(".pdf", true) || infoBook.originName.endsWith(".pdf", true))
+        menu.findItem(R.id.menu_convert_txt)?.isVisible =
+            viewModel.bookData.value?.let { infoBook ->
+                infoBook.bookUrl.endsWith(".pdf", true) || infoBook.originName.endsWith(".pdf", true)
+            } == true
         menu.findItem(R.id.menu_delete_alert)?.isChecked =
             LocalConfig.bookInfoDeleteAlert
         return super.onMenuOpened(featureId, menu)
