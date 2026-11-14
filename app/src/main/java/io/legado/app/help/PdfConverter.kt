@@ -92,9 +92,20 @@ object PdfConverter {
                     webViewRef = webView
                     webView.webViewClient = object : WebViewClient() {
                         override fun onPageFinished(view: WebView, url: String) {
-                            view.evaluateJavascript(
-                                "startExtract('file://${tmpPdf.absolutePath}')", null
-                            )
+                            // base64 分块注入，绕开 WebView 对 file:// 的读取限制
+                            val bytes = tmpPdf.readBytes()
+                            val b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                            view.evaluateJavascript("window.PDF_B64_CHUNKS = []", null)
+                            var idx = 0
+                            while (idx < b64.length) {
+                                val end = minOf(idx + 400_000, b64.length)
+                                val chunk = b64.substring(idx, end)
+                                view.evaluateJavascript(
+                                    "window.PDF_B64_CHUNKS.push('$chunk')", null
+                                )
+                                idx = end
+                            }
+                            view.evaluateJavascript("startExtractFromChunks()", null)
                         }
                     }
                     webView.loadUrl("file:///android_asset/pdf2txt/index.html")
