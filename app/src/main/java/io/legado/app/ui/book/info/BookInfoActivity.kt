@@ -304,10 +304,16 @@ class BookInfoActivity :
             }
             try {
                 val txtUri = PdfConverter.convertToTxt(b.bookUrl.toUri(), b.originName)
-                withContext(IO) {
+                val txtBook = withContext(IO) {
                     LocalBook.importFile(txtUri)
                 }
-                toastOnUi("已转换为 TXT 并加入书架，原 PDF 书可手动删除")
+                alert("转换完成", "TXT《${txtBook.name}》已加入书架。\n\n原 PDF 书《${b.name}》要保留在书架上吗？（PDF 文件本身会始终保留）") {
+                    positiveButton("保留") { }
+                    negativeButton("删除") {
+                        LocalBook.deleteBook(b, false)
+                        toastOnUi("已从书架删除 PDF 书")
+                    }
+                }
             } catch (e: Exception) {
                 toastOnUi(e.message ?: "转换失败")
             } finally {
