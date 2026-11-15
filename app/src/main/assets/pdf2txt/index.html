@@ -77,7 +77,7 @@ function itemsToText(items) {
     diffs.sort(function (a, b) { return a - b; });
     const medianDy = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 0;
 
-    // 3) 行 → 文本：新段 = 首行缩进 或 行距超基准1.5倍 或 前行句末标点+轻微缩进
+    // 3) 行 → 段落：段内行直接合并（PDF 折行还原），段边界才换行
     const endPunct = /[。！？…”』」\)]$/;
     let out = '';
     let prev = null;
@@ -89,7 +89,12 @@ function itemsToText(items) {
                 (indent > ln.size * 1.2 && ln.x > prev.x) ||
                 (medianDy > 0 && dy > medianDy * 1.5) ||
                 (endPunct.test(prev.text) && indent > ln.size * 0.3);
-            out += isPara ? '\n\n' : '\n';
+            if (isPara) {
+                out += '\n';
+            } else if (/[A-Za-z0-9]$/.test(prev.text) && /^[A-Za-z0-9]/.test(ln.text)) {
+                // 英文跨行断词：补一个空格
+                out += ' ';
+            }
         }
         out += ln.text;
         prev = ln;
