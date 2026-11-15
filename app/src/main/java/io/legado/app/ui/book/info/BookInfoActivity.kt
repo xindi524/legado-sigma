@@ -321,7 +321,11 @@ class BookInfoActivity :
                             "提示：当前版本书架同名书籍会互相替换，PDF 书已被 TXT 版取代；" +
                             "PDF 原文件仍保留在书籍保存位置。"
                     )
-                    positiveButton("知道了") { }
+                    positiveButton("开始阅读") {
+                        viewModel.upBook(txtBook)
+                        startReadActivity(txtBook)
+                    }
+                    negativeButton("稍后") { }
                 }
             } catch (e: Exception) {
                 toastOnUi(e.message ?: "转换失败")
