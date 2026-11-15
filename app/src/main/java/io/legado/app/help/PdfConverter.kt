@@ -91,7 +91,12 @@ object PdfConverter {
                     var webViewRef: WebView? = null
                     val bridge = Bridge(
                         onInfoCb = { },
-                        onPageCb = { _, _, text -> sb.append(text) },
+                        onPageCb = { _, _, text ->
+                            // 跨页拼接：前行句末标点结尾 → 分段换行，否则直接连（跨页断词还原）
+                            val last = sb.lastOrNull()
+                            if (last != null && last in "。！？…”』」") sb.append('\n')
+                            sb.append(text)
+                        },
                         onCoverCb = { dataUrl -> coverDataUrl = dataUrl },
                         onDoneCb = { error ->
                             mainHandler.post {
