@@ -315,7 +315,7 @@ class BookInfoActivity :
                     }
                     tb
                 }
-                alert("转换完成") {
+                alert("转换完成（分段引擎 v2）") {
                     setMessage(
                         "TXT《${txtBook.name}》已生成并加入书架，封面同步自 PDF 第一页。\n\n" +
                             "提示：当前版本书架同名书籍会互相替换，PDF 书已被 TXT 版取代；" +
