@@ -51,8 +51,7 @@ object PdfConverter {
      * coverOut 非空时，把 PDF 第一页渲染的 jpeg 写入该文件作为封面。
      */
     suspend fun convertToTxt(pdfUri: Uri, fileName: String, coverOut: File? = null): Uri {
-        var coverBytes: ByteArray? = null
-        val text = extractText(pdfUri) { coverBytes = it }
+        val (text, coverBytes) = extractText(pdfUri)
         if (text.trim().length < 20) {
             throw NoStackTraceException("该 PDF 没有可提取的文字内容（可能为扫描版/图片版），暂不支持转换")
         }
