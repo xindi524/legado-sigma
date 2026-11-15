@@ -77,15 +77,18 @@ function itemsToText(items) {
     diffs.sort(function (a, b) { return a - b; });
     const medianDy = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 0;
 
-    // 3) 行 → 文本：新段 = 行距超基准1.6倍 或 行首明显缩进
+    // 3) 行 → 文本：新段 = 首行缩进 或 行距超基准1.5倍 或 前行句末标点+轻微缩进
+    const endPunct = /[。！？…”』」\)]$/;
     let out = '';
     let prev = null;
     for (const ln of lines) {
         if (prev !== null) {
             const dy = prev.y - ln.y;
             const indent = ln.x - minX;
-            const isPara = (medianDy > 0 && dy > medianDy * 1.6) ||
-                (indent > ln.size * 1.2 && ln.x > prev.x);
+            const isPara =
+                (indent > ln.size * 1.2 && ln.x > prev.x) ||
+                (medianDy > 0 && dy > medianDy * 1.5) ||
+                (endPunct.test(prev.text) && indent > ln.size * 0.3);
             out += isPara ? '\n\n' : '\n';
         }
         out += ln.text;
