@@ -91,7 +91,7 @@ object PdfConverter {
                     var webViewRef: WebView? = null
                     val bridge = Bridge(
                         onInfoCb = { },
-                        onPageCb = { _, _, text -> sb.append(text).append("\n\n") },
+                        onPageCb = { _, _, text -> sb.append(text) },
                         onCoverCb = { dataUrl -> coverDataUrl = dataUrl },
                         onDoneCb = { error ->
                             mainHandler.post {
