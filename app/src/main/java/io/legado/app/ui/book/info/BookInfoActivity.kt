@@ -305,7 +305,7 @@ class BookInfoActivity :
             }
             try {
                 val coverFile = File(this@BookInfoActivity.filesDir, "covers/${b.name}.jpg")
-                val (_, _, debugJson) = PdfConverter.convertToTxt(b.bookUrl.toUri(), b.originName, coverFile)
+                val (txtUri, _, debugJson) = PdfConverter.convertToTxt(b.bookUrl.toUri(), b.originName, coverFile)
                 val txtBook = withContext(IO) {
                     val tb = LocalBook.importFile(txtUri)
                     // PDF 第一页渲染图作为 TXT 书封面
