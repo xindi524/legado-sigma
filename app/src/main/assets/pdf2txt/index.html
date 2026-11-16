@@ -80,7 +80,8 @@ function itemsToText(items) {
     if (cur) lines.push(cur);
     if (lines.length === 0) return '';
 
-    // 2) 正文左边界（最小行起点）与基准行距（相邻行 y 差的中位数）
+    // 2) 正文左边界（最小行起点）与基准行距
+    // 基准取最小相邻差（=段内折行距）；段间距通常是它的整数倍，×1.5 即可区分
     let minX = Infinity;
     for (const ln of lines) minX = Math.min(minX, ln.x);
     const diffs = [];
@@ -89,7 +90,7 @@ function itemsToText(items) {
         if (dy > 1) diffs.push(dy);
     }
     diffs.sort(function (a, b) { return a - b; });
-    const medianDy = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 0;
+    const baseDy = diffs.length ? diffs[0] : 0;
 
     // 3) 行 → 段落：段内行直接合并（PDF 折行还原），段边界才换行
     const endPunct = /[。！？…”』」\)]$/;
@@ -103,7 +104,7 @@ function itemsToText(items) {
             // 段首缩进 / 段间距 / 句末+缩进 / 开引号或破折号起行 / 超短句（独立对话/独白）
             const isPara =
                 indent > ln.size * 1.2 ||
-                (medianDy > 0 && dy > medianDy * 1.5) ||
+                (baseDy > 0 && dy > baseDy * 1.5) ||
                 (endPunct.test(prev.text) && indent > ln.size * 0.3) ||
                 openQuote.test(ln.text) ||
                 (ln.text.length <= 3 && endPunct.test(ln.text));
