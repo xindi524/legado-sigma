@@ -250,7 +250,12 @@ object LocalBook {
         }
         var book = appDb.bookDao.getBook(bookUrl)
         if (book == null) {
-            val nameAuthor = analyzeNameAuthor(fileName)
+            // F9: 内嵌元数据优先（EPUB metadata / TXT 内容头），文件名解析兜底
+            val fileNameAuthor = analyzeNameAuthor(fileName)
+            val scanned = BookMetaScan.scan(uri, fileName)
+            val nameAuthor = scanned?.let { s ->
+                Pair(s.first.ifBlank { fileNameAuthor.first }, s.second.ifBlank { fileNameAuthor.second })
+            } ?: fileNameAuthor
             book = Book(
                 type = BookType.text or BookType.local,
                 bookUrl = bookUrl,
