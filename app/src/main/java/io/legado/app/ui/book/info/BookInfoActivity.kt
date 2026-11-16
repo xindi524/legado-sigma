@@ -332,7 +332,10 @@ class BookInfoActivity :
                     }
                 }
             } catch (e: Exception) {
-                toastOnUi(e.message ?: "转换失败")
+                alert("转换失败") {
+                    setMessage(e.message ?: "未知错误")
+                    positiveButton("知道了") { }
+                }.show()
             } finally {
                 waitDialog.dismiss()
             }
