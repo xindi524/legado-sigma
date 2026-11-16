@@ -30,7 +30,7 @@ object PdfConverter {
         private val onInfoCb: (Int) -> Unit,
         private val onPageCb: (Int, Int, String) -> Unit,
         private val onCoverCb: (String) -> Unit,
-        private val onDoneCb: (String?) -> Unit
+        private val onDoneCb: (String?, String?) -> Unit
     ) {
         @JavascriptInterface
         fun onInfo(total: Int) = onInfoCb(total)
@@ -42,7 +42,7 @@ object PdfConverter {
         fun onCover(dataUrl: String) = onCoverCb(dataUrl)
 
         @JavascriptInterface
-        fun onDone(error: String?) = onDoneCb(error)
+        fun onDone(error: String?, debug: String?) = onDoneCb(error, debug)
     }
 
     /**
@@ -50,8 +50,8 @@ object PdfConverter {
      * fileName 为原始 PDF 文件名（含 .pdf 后缀），输出同名 .txt。
      * coverOut 非空时，把 PDF 第一页渲染的 jpeg 写入该文件作为封面。
      */
-    suspend fun convertToTxt(pdfUri: Uri, fileName: String, coverOut: File? = null): Uri {
-        val (text, coverBytes) = extractText(pdfUri)
+    suspend fun convertToTxt(pdfUri: Uri, fileName: String, coverOut: File? = null): Triple<Uri, ByteArray?, String?> {
+        val (text, coverBytes, debugJson) = extractText(pdfUri)
         if (text.trim().length < 20) {
             throw NoStackTraceException("该 PDF 没有可提取的文字内容（可能为扫描版/图片版），暂不支持转换")
         }
@@ -65,14 +65,14 @@ object PdfConverter {
                 }
             }
         }
-        return uri
+        return Triple(uri, coverBytes, debugJson)
     }
 
     /**
      * 提取 PDF 全部文字，页与页之间以空行分隔。
      * onCover 回传第一页渲染的 jpeg 字节（可能为空）。
      */
-    suspend fun extractText(pdfUri: Uri, onCover: (ByteArray?) -> Unit = {}): Pair<String, ByteArray?> = withTimeout(TIMEOUT_MS) {
+    suspend fun extractText(pdfUri: Uri, onCover: (ByteArray?) -> Unit = {}): Triple<String, ByteArray?, String?> = withTimeout(TIMEOUT_MS) {
         // 1) PDF 复制到缓存，供 WebView 内 pdf.js 读取
         val tmpPdf = withContext(Dispatchers.IO) {
             val f = File(appCtx.cacheDir, "pdf2txt_tmp.pdf")
@@ -88,6 +88,7 @@ object PdfConverter {
                     val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
                     val sb = StringBuilder()
                     var coverDataUrl: String? = null
+                    var debugJson: String? = null
                     var webViewRef: WebView? = null
                     val bridge = Bridge(
                         onInfoCb = { },
@@ -98,12 +99,13 @@ object PdfConverter {
                             sb.append(text)
                         },
                         onCoverCb = { dataUrl -> coverDataUrl = dataUrl },
-                        onDoneCb = { error ->
+                        onDoneCb = { error, debug ->
+                            debugJson = debug
                             mainHandler.post {
                                 webViewRef?.destroy()
                                 if (cont.isActive) {
                                     if (error.isNullOrBlank()) {
-                                        cont.resume(sb.toString() to decodeCover(coverDataUrl))
+                                        cont.resume(Triple(sb.toString(), decodeCover(coverDataUrl), debugJson))
                                     } else cont.resumeWithException(
                                         NoStackTraceException("PDF 转换失败：$error")
                                     )
