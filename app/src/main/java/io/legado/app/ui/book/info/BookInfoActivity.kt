@@ -305,7 +305,7 @@ class BookInfoActivity :
             }
             try {
                 val coverFile = File(this@BookInfoActivity.filesDir, "covers/${b.name}.jpg")
-                val txtUri = PdfConverter.convertToTxt(b.bookUrl.toUri(), b.originName, coverFile)
+                val (_, _, debugJson) = PdfConverter.convertToTxt(b.bookUrl.toUri(), b.originName, coverFile)
                 val txtBook = withContext(IO) {
                     val tb = LocalBook.importFile(txtUri)
                     // PDF 第一页渲染图作为 TXT 书封面
@@ -326,6 +326,10 @@ class BookInfoActivity :
                         startReadActivity(txtBook)
                     }
                     negativeButton("稍后") { }
+                    neutralButton("复制调试信息") {
+                        sendToClip(debugJson ?: "无调试数据")
+                        toastOnUi("调试信息已复制，可发给开发者")
+                    }
                 }
             } catch (e: Exception) {
                 toastOnUi(e.message ?: "转换失败")
