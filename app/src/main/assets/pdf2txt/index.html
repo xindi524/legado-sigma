@@ -93,19 +93,20 @@ function itemsToText(items) {
 
     // 3) 行 → 段落：段内行直接合并（PDF 折行还原），段边界才换行
     const endPunct = /[。！？…”』」\)]$/;
-    const openQuote = /^[“"『「'‘《（\[【]/;
+    const openQuote = /^[“"『「'‘《（\[【＂''❝❞«‹»›—–]/;
     let out = '';
     let prev = null;
     for (const ln of lines) {
         if (prev !== null) {
             const dy = prev.y - ln.y;
             const indent = ln.x - minX;
-            // 段首缩进 / 段间距 / 句末+缩进 / 开引号起行（对话，避头尾保证行首引号≈段首）
+            // 段首缩进 / 段间距 / 句末+缩进 / 开引号或破折号起行 / 超短句（独立对话/独白）
             const isPara =
                 indent > ln.size * 1.2 ||
                 (medianDy > 0 && dy > medianDy * 1.5) ||
                 (endPunct.test(prev.text) && indent > ln.size * 0.3) ||
-                openQuote.test(ln.text);
+                openQuote.test(ln.text) ||
+                (ln.text.length <= 3 && endPunct.test(ln.text));
             if (isPara) {
                 out += '\n';
             } else if (/[A-Za-z0-9]$/.test(prev.text) && /^[A-Za-z0-9]/.test(ln.text)) {
